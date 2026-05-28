@@ -8,12 +8,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.egabel.daddont.ui.screen.ImpulseDetailScreen
 import com.egabel.daddont.ui.screen.ImpulseListScreen
+import com.egabel.daddont.ui.screen.SettingsScreen
 import com.egabel.daddont.ui.screen.StatsScreen
 
 object Routes {
     const val IMPULSE_LIST = "impulseList"
     const val IMPULSE_DETAIL = "impulseDetail/{impulseId}"
     const val STATS = "stats"
+    const val SETTINGS = "settings"
 
     fun impulseDetail(impulseId: String) = "impulseDetail/$impulseId"
 }
@@ -31,6 +33,9 @@ fun DadDontNavGraph(navController: NavHostController) {
                 },
                 onStatsClick = {
                     navController.navigate(Routes.STATS)
+                },
+                onSettingsClick = {
+                    navController.navigate(Routes.SETTINGS)
                 }
             )
         }
@@ -46,6 +51,12 @@ fun DadDontNavGraph(navController: NavHostController) {
 
         composable(Routes.STATS) {
             StatsScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(
                 onBack = { navController.popBackStack() }
             )
         }

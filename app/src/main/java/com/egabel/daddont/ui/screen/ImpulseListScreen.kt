@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -71,6 +72,7 @@ import java.util.UUID
 fun ImpulseListScreen(
     onImpulseClick: (UUID) -> Unit,
     onStatsClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     viewModel: ImpulseListViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -104,6 +106,9 @@ fun ImpulseListScreen(
                 actions = {
                     IconButton(onClick = onStatsClick) {
                         Icon(Icons.Default.BarChart, contentDescription = "Stats")
+                    }
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 }
             )
