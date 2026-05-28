@@ -60,7 +60,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.egabel.daddont.data.model.DismissalType
 import com.egabel.daddont.data.model.ImpulseState
 import com.egabel.daddont.ui.theme.ImpulseColors
-import com.egabel.daddont.ui.theme.RamonaBadge
+import com.egabel.daddont.ui.theme.PartnerBadge
 import com.egabel.daddont.ui.viewmodel.DialogMessage
 import com.egabel.daddont.ui.viewmodel.ImpulseDetailViewModel
 import java.text.SimpleDateFormat
@@ -133,9 +133,9 @@ fun ImpulseDetailScreen(
                                 color = borderColor,
                                 fontWeight = FontWeight.Bold
                             )
-                            if (impulse.ramonaGate) {
-                                Badge(containerColor = RamonaBadge) {
-                                    Text("Ramona", color = Color.White)
+                            if (impulse.partnerGate) {
+                                Badge(containerColor = PartnerBadge) {
+                                    Text("Discuss", color = Color.White)
                                 }
                             }
                         }
@@ -163,13 +163,13 @@ fun ImpulseDetailScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        if (impulse.ramonaGate && impulse.ramonaReason != null) {
+                        if (impulse.partnerGate && impulse.partnerReason != null) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = impulse.ramonaReason,
+                                text = impulse.partnerReason,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontStyle = FontStyle.Italic,
-                                color = RamonaBadge
+                                color = PartnerBadge
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
@@ -248,18 +248,18 @@ fun ImpulseDetailScreen(
                             fontWeight = FontWeight.Bold
                         )
 
-                        if (impulse.ramonaGate) {
+                        if (impulse.partnerGate) {
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 AssistChip(
-                                    onClick = { viewModel.dismiss(DismissalType.RAMONA_APPROVED) },
-                                    label = { Text("Ramona approved") }
+                                    onClick = { viewModel.dismiss(DismissalType.PARTNER_APPROVED) },
+                                    label = { Text("Love of your life approved") }
                                 )
                                 AssistChip(
-                                    onClick = { viewModel.dismiss(DismissalType.RAMONA_DECLINED) },
-                                    label = { Text("Ramona declined") }
+                                    onClick = { viewModel.dismiss(DismissalType.PARTNER_DECLINED) },
+                                    label = { Text("Love of your life declined") }
                                 )
                                 AssistChip(
                                     onClick = { viewModel.dismiss(DismissalType.DECIDED_NOT_TO_ASK) },
@@ -302,9 +302,9 @@ fun ImpulseDetailScreen(
                         }
                     }
 
-                    // Manual Ramona flag toggle
-                    TextButton(onClick = { viewModel.toggleRamonaFlag() }) {
-                        Text(if (impulse.ramonaGate) "Remove Ramona flag" else "Flag for Ramona")
+                    // Manual partner flag toggle
+                    TextButton(onClick = { viewModel.togglePartnerFlag() }) {
+                        Text(if (impulse.partnerGate) "Remove partner flag" else "Needs their blessing")
                     }
                 }
             }

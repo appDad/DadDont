@@ -37,8 +37,8 @@ class ImpulseRepository(private val db: DadDontDatabase) {
             impulses.map { ImpulseWithState(it, ImpulseState.GRAY) }
         }
 
-    fun observeRamonaFlagged(): Flow<List<ImpulseWithState>> =
-        impulseDao.observeRamonaFlagged().map { impulses ->
+    fun observePartnerFlagged(): Flow<List<ImpulseWithState>> =
+        impulseDao.observePartnerFlagged().map { impulses ->
             impulses.map { ImpulseWithState(it, ImpulseStateCalculator.computeState(it)) }
         }
 
@@ -84,9 +84,9 @@ class ImpulseRepository(private val db: DadDontDatabase) {
         impulseDao.update(impulse.copy(sentToDadDoAt = System.currentTimeMillis()))
     }
 
-    suspend fun toggleRamonaFlag(impulseId: UUID) {
+    suspend fun togglePartnerFlag(impulseId: UUID) {
         val impulse = impulseDao.getById(impulseId) ?: return
-        impulseDao.update(impulse.copy(ramonaGate = !impulse.ramonaGate))
+        impulseDao.update(impulse.copy(partnerGate = !impulse.partnerGate))
     }
 
     suspend fun getUngraded(): List<Impulse> = impulseDao.getUngraded()

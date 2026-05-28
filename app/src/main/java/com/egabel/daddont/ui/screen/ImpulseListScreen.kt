@@ -59,7 +59,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.egabel.daddont.data.model.ImpulseState
 import com.egabel.daddont.data.repository.ImpulseWithState
 import com.egabel.daddont.ui.theme.ImpulseColors
-import com.egabel.daddont.ui.theme.RamonaBadge
+import com.egabel.daddont.ui.theme.PartnerBadge
 import com.egabel.daddont.ui.viewmodel.ImpulseListViewModel
 import com.egabel.daddont.ui.viewmodel.ListFilter
 import java.text.SimpleDateFormat
@@ -181,9 +181,9 @@ fun ImpulseListScreen(
                     label = { Text("Archive") }
                 )
                 FilterChip(
-                    selected = uiState.filter == ListFilter.RAMONA,
-                    onClick = { viewModel.setFilter(ListFilter.RAMONA) },
-                    label = { Text("Ramona") }
+                    selected = uiState.filter == ListFilter.PARTNER,
+                    onClick = { viewModel.setFilter(ListFilter.PARTNER) },
+                    label = { Text("To Discuss") }
                 )
             }
 
@@ -199,7 +199,7 @@ fun ImpulseListScreen(
                         text = when (uiState.filter) {
                             ListFilter.ACTIVE -> "No active impulses.\nCapture one above."
                             ListFilter.ARCHIVE -> "Nothing archived yet."
-                            ListFilter.RAMONA -> "No Ramona-flagged items."
+                            ListFilter.PARTNER -> "Nothing flagged for discussion yet."
                         },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -255,9 +255,9 @@ private fun ImpulseCard(
                     fontWeight = FontWeight.Bold
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (item.impulse.ramonaGate) {
-                        Badge(containerColor = RamonaBadge) {
-                            Text("R", color = androidx.compose.ui.graphics.Color.White)
+                    if (item.impulse.partnerGate) {
+                        Badge(containerColor = PartnerBadge) {
+                            Text("♥", color = androidx.compose.ui.graphics.Color.White)
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                     }

@@ -39,8 +39,8 @@ class ClassificationWorker(
                     impulse.copy(
                         tier = Tier.valueOf(classification.tier),
                         category = Category.valueOf(classification.category),
-                        ramonaGate = classification.ramonaGate,
-                        ramonaReason = classification.ramonaReason.ifEmpty { null },
+                        partnerGate = classification.partnerGate,
+                        partnerReason = classification.partnerReason.ifEmpty { null },
                         ungraded = false
                     )
                 )

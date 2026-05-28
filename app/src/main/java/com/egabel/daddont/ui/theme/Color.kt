@@ -11,7 +11,7 @@ val GreenStateContainer = Color(0xFFC8E6C9)
 val GrayState = Color(0xFF9E9E9E)
 val GrayStateContainer = Color(0xFFE0E0E0)
 
-val RamonaBadge = Color(0xFF7B1FA2)
+val PartnerBadge = Color(0xFF7B1FA2)
 
 val DarkBackground = Color(0xFF121212)
 val DarkSurface = Color(0xFF1E1E1E)

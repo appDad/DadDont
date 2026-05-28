@@ -47,8 +47,8 @@ class GeminiClient(private val context: Context) {
     data class ClassificationResult(
         val tier: String,
         val category: String,
-        val ramonaGate: Boolean,
-        val ramonaReason: String
+        val partnerGate: Boolean,
+        val partnerReason: String
     )
 
     suspend fun classify(impulseText: String): ClassificationResult? = withContext(Dispatchers.IO) {
@@ -62,7 +62,7 @@ You are a classification engine for an impulse-control app. Given an impulse des
 
 2. "category" — one of: PURCHASE, IDEA, COMMUNICATION, COMMITMENT, OTHER
 
-3. "ramonaGate" — true if this impulse is communal (affects partner/family), false if personal:
+3. "partnerGate" — true if this impulse is communal (affects partner/family), false if personal:
    Communal (flag true):
    - Anything affecting the kids
    - Real estate, major home purchases or changes
@@ -75,7 +75,7 @@ You are a classification engine for an impulse-control app. Given an impulse des
    - Personal hobbies, individual time
    - Minor consumables
 
-4. "ramonaReason" — if ramonaGate is true, a short explanation of why. Empty string if false.
+4. "partnerReason" — if partnerGate is true, a short explanation of why. Empty string if false.
 
 Return ONLY raw JSON. No markdown fences, no explanation.
 
@@ -88,10 +88,10 @@ Impulse: "$impulseText"
             val obj = json.parseToJsonElement(responseText.stripFences()).jsonObject
             val tier = obj["tier"]?.jsonPrimitive?.content ?: return@runCatching null
             val category = obj["category"]?.jsonPrimitive?.content ?: return@runCatching null
-            val ramonaGate = obj["ramonaGate"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
-            val ramonaReason = obj["ramonaReason"]?.jsonPrimitive?.content ?: ""
+            val partnerGate = obj["partnerGate"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
+            val partnerReason = obj["partnerReason"]?.jsonPrimitive?.content ?: ""
 
-            ClassificationResult(tier, category, ramonaGate, ramonaReason)
+            ClassificationResult(tier, category, partnerGate, partnerReason)
         }.onFailure {
             Log.e(TAG, "JSON parse failed: $responseText", it)
         }.getOrNull()

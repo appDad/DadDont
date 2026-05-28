@@ -95,9 +95,9 @@ class ImpulseDetailViewModel(
         }
     }
 
-    fun toggleRamonaFlag() {
+    fun togglePartnerFlag() {
         viewModelScope.launch {
-            repository.toggleRamonaFlag(impulseId)
+            repository.togglePartnerFlag(impulseId)
         }
     }
 

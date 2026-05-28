@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-enum class ListFilter { ACTIVE, ARCHIVE, RAMONA }
+enum class ListFilter { ACTIVE, ARCHIVE, PARTNER }
 
 data class ImpulseListUiState(
     val impulses: List<ImpulseWithState> = emptyList(),
@@ -35,11 +35,11 @@ class ImpulseListViewModel(application: Application) : AndroidViewModel(applicat
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     private val archivedImpulses = repository.observeArchivedWithState()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    private val ramonaImpulses = repository.observeRamonaFlagged()
+    private val partnerImpulses = repository.observePartnerFlagged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val uiState: StateFlow<ImpulseListUiState> = combine(
-        _filter, _captureText, _isCapturing, activeImpulses, archivedImpulses, ramonaImpulses
+        _filter, _captureText, _isCapturing, activeImpulses, archivedImpulses, partnerImpulses
     ) { values ->
         val filter = values[0] as ListFilter
         val captureText = values[1] as String
@@ -48,7 +48,7 @@ class ImpulseListViewModel(application: Application) : AndroidViewModel(applicat
         val impulses = when (filter) {
             ListFilter.ACTIVE -> values[3] as List<ImpulseWithState>
             ListFilter.ARCHIVE -> values[4] as List<ImpulseWithState>
-            ListFilter.RAMONA -> values[5] as List<ImpulseWithState>
+            ListFilter.PARTNER -> values[5] as List<ImpulseWithState>
         }
         ImpulseListUiState(
             impulses = impulses,
@@ -98,9 +98,9 @@ class ImpulseListViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun toggleRamonaFlag(impulseId: UUID) {
+    fun togglePartnerFlag(impulseId: UUID) {
         viewModelScope.launch {
-            repository.toggleRamonaFlag(impulseId)
+            repository.togglePartnerFlag(impulseId)
         }
     }
 }

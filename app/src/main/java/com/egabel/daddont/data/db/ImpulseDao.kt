@@ -22,8 +22,8 @@ interface ImpulseDao {
     @Query("SELECT * FROM impulses WHERE dismissedAt IS NOT NULL ORDER BY dismissedAt DESC")
     fun observeArchived(): Flow<List<Impulse>>
 
-    @Query("SELECT * FROM impulses WHERE ramonaGate = 1 ORDER BY createdAt DESC")
-    fun observeRamonaFlagged(): Flow<List<Impulse>>
+    @Query("SELECT * FROM impulses WHERE partnerGate = 1 ORDER BY createdAt DESC")
+    fun observePartnerFlagged(): Flow<List<Impulse>>
 
     @Query("SELECT * FROM impulses WHERE ungraded = 1")
     suspend fun getUngraded(): List<Impulse>
