@@ -11,8 +11,10 @@ import com.egabel.daddont.Prefs
 import com.egabel.daddont.api.gemini.TalkMeDownClient
 import com.egabel.daddont.api.tasks.AuthResult
 import com.egabel.daddont.api.tasks.GoogleTasksClient
+import com.egabel.daddont.data.model.Category
 import com.egabel.daddont.data.model.DismissalType
 import com.egabel.daddont.data.model.ReturnEvent
+import com.egabel.daddont.data.model.Tier
 import com.egabel.daddont.data.repository.ImpulseRepository
 import com.egabel.daddont.data.repository.ImpulseWithState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -152,13 +154,33 @@ class ImpulseDetailViewModel(
                 val returnEvents = repository.getReturnEvents(impulseId)
                 val priorTranscript = repository.getLatestDialogTranscript(impulseId)
 
-                val response = talkMeDownClient.chat(
+                val result = talkMeDownClient.chat(
                     impulseText = impulse.content,
+                    currentTier = impulse.tier?.name,
+                    currentCategory = impulse.category?.name,
+                    currentPartnerGate = impulse.partnerGate,
                     returnLog = returnEvents,
                     priorTranscript = priorTranscript,
                     userMessage = text
                 )
-                _dialogMessages.value = _dialogMessages.value + DialogMessage("assistant", response)
+                _dialogMessages.value = _dialogMessages.value + DialogMessage("assistant", result.response)
+
+                // Apply reclassification silently if the LLM detected a misclassification
+                result.reclassification?.let { r ->
+                    var updated = impulse
+                    r.tier?.let { t ->
+                        runCatching { Tier.valueOf(t) }.getOrNull()?.let { updated = updated.copy(tier = it) }
+                    }
+                    r.category?.let { c ->
+                        runCatching { Category.valueOf(c) }.getOrNull()?.let { updated = updated.copy(category = it) }
+                    }
+                    r.partnerGate?.let { updated = updated.copy(partnerGate = it) }
+                    r.partnerReason?.let { updated = updated.copy(partnerReason = it.ifEmpty { null }) }
+                    if (updated != impulse) {
+                        repository.updateClassification(updated)
+                        Log.d("ImpulseDetailVM", "Reclassified impulse via dialog: tier=${updated.tier}, cat=${updated.category}, partner=${updated.partnerGate}")
+                    }
+                }
 
                 val transcript = Json.encodeToString(
                     JsonArray.serializer(),
