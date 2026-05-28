@@ -1,8 +1,9 @@
 package com.egabel.daddont.ui.screen
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -13,17 +14,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -42,6 +44,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -51,6 +54,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
@@ -94,7 +99,10 @@ fun ImpulseDetailScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -106,7 +114,8 @@ fun ImpulseDetailScreen(
 
         val impulse = impulseWithState.impulse
         val state = impulseWithState.state
-        val borderColor = ImpulseColors.borderColor(state)
+        val stateColor = ImpulseColors.borderColor(state)
+        val containerColor = ImpulseColors.containerColor(state)
 
         LazyColumn(
             modifier = Modifier
@@ -115,79 +124,113 @@ fun ImpulseDetailScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header card
+            // Header card with gradient
             item {
                 Card(
-                    border = BorderStroke(2.dp, borderColor),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = ImpulseColors.label(state),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = borderColor,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                impulseWithState.msUntilNext?.let { ms ->
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "· ${formatCountdown(ms)}",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        containerColor.copy(alpha = 0.6f),
+                                        MaterialTheme.colorScheme.surface
                                     )
+                                )
+                            )
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(stateColor)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = ImpulseColors.label(state),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = stateColor,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    impulseWithState.msUntilNext?.let { ms ->
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "· ${formatCountdown(ms)}",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                                if (impulse.partnerGate) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.ChatBubbleOutline,
+                                            contentDescription = "Discuss with partner",
+                                            modifier = Modifier.size(18.dp),
+                                            tint = PartnerBadge
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Discuss",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = PartnerBadge,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
                                 }
                             }
-                            if (impulse.partnerGate) {
-                                Badge(containerColor = PartnerBadge) {
-                                    Text("Discuss", color = Color.White)
-                                }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = impulse.content,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Text(
+                                    text = impulse.tier?.name ?: "Ungraded",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                                Text(
+                                    text = impulse.category?.name ?: "",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                                Text(
+                                    text = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+                                        .format(Date(impulse.createdAt)),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
                             }
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = impulse.content,
-                            style = MaterialTheme.typography.headlineSmall
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            if (impulse.partnerGate && impulse.partnerReason != null) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = impulse.partnerReason,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontStyle = FontStyle.Italic,
+                                    color = PartnerBadge.copy(alpha = 0.8f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = impulse.tier?.name ?: "Ungraded",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = impulse.category?.name ?: "",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
-                                    .format(Date(impulse.createdAt)),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "Returned ${impulse.returnCount}x · Reactivated ${impulse.reactivationCount}x",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
                         }
-                        if (impulse.partnerGate && impulse.partnerReason != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = impulse.partnerReason,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontStyle = FontStyle.Italic,
-                                color = PartnerBadge
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Returned ${impulse.returnCount}x · Reactivated ${impulse.reactivationCount}x",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }
@@ -195,12 +238,12 @@ fun ImpulseDetailScreen(
             // Actions
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // "Impulse returned" button — available on red/yellow/green
                     if (state != ImpulseState.GRAY) {
                         if (!showReturnDialog) {
                             OutlinedButton(
                                 onClick = { showReturnDialog = true },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -208,25 +251,30 @@ fun ImpulseDetailScreen(
                             }
                         } else {
                             Card(
+                                shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                 )
                             ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
+                                Column(modifier = Modifier.padding(14.dp)) {
                                     OutlinedTextField(
                                         value = returnRationale,
                                         onValueChange = { returnRationale = it },
                                         label = { Text("Why still want this? (optional)") },
                                         modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(12.dp)
                                     )
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(10.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Button(onClick = {
-                                            viewModel.recordReturn(returnRationale.ifBlank { null })
-                                            returnRationale = ""
-                                            showReturnDialog = false
-                                        }) { Text("Record") }
+                                        Button(
+                                            onClick = {
+                                                viewModel.recordReturn(returnRationale.ifBlank { null })
+                                                returnRationale = ""
+                                                showReturnDialog = false
+                                            },
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) { Text("Record") }
                                         TextButton(onClick = {
                                             returnRationale = ""
                                             showReturnDialog = false
@@ -237,11 +285,11 @@ fun ImpulseDetailScreen(
                         }
                     }
 
-                    // Reactivate from gray
                     if (state == ImpulseState.GRAY && impulse.dismissedAt != null) {
                         OutlinedButton(
                             onClick = { viewModel.recordReturn() },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
@@ -249,9 +297,8 @@ fun ImpulseDetailScreen(
                         }
                     }
 
-                    // Green actions: execute, dismiss, move to DadDo
                     if (state == ImpulseState.GREEN) {
-                        HorizontalDivider()
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                         Text(
                             text = "Cooled — your call",
                             style = MaterialTheme.typography.titleSmall,
@@ -296,6 +343,7 @@ fun ImpulseDetailScreen(
                             Button(
                                 onClick = { viewModel.sendToDadDo() },
                                 modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.secondary
                                 )
@@ -312,8 +360,15 @@ fun ImpulseDetailScreen(
                         }
                     }
 
-                    // Manual partner flag toggle
                     TextButton(onClick = { viewModel.togglePartnerFlag() }) {
+                        Icon(
+                            imageVector = Icons.Outlined.ChatBubbleOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = if (impulse.partnerGate) PartnerBadge
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(if (impulse.partnerGate) "Remove partner flag" else "Needs their blessing")
                     }
                 }
@@ -321,7 +376,7 @@ fun ImpulseDetailScreen(
 
             // Talk Me Down section
             item {
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 val shouldSuggest = impulse.returnCount >= 3 && !uiState.showTalkMeDown
                 Column {
                     Row(
@@ -330,8 +385,12 @@ fun ImpulseDetailScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TextButton(onClick = { viewModel.toggleTalkMeDown() }) {
-                            Icon(Icons.Default.Chat, contentDescription = null)
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                Icons.Outlined.ChatBubbleOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text("Talk me through this")
                         }
                     }
@@ -339,7 +398,7 @@ fun ImpulseDetailScreen(
                         Text(
                             text = "You've returned to this ${impulse.returnCount} times. Want to talk it through?",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             modifier = Modifier.padding(start = 12.dp)
                         )
                     }
@@ -355,7 +414,8 @@ fun ImpulseDetailScreen(
                 if (uiState.isDialogLoading) {
                     item {
                         CircularProgressIndicator(
-                            modifier = Modifier.padding(16.dp)
+                            modifier = Modifier.padding(16.dp),
+                            strokeWidth = 2.dp
                         )
                     }
                 }
@@ -387,7 +447,7 @@ fun ImpulseDetailScreen(
             // Return history
             if (uiState.returnEvents.isNotEmpty()) {
                 item {
-                    HorizontalDivider()
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     Text(
                         text = "Return History",
                         style = MaterialTheme.typography.titleSmall,
@@ -405,7 +465,7 @@ fun ImpulseDetailScreen(
                             text = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
                                 .format(Date(event.timestamp)),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                         if (event.rationale != null) {
                             Spacer(modifier = Modifier.width(8.dp))
@@ -441,12 +501,17 @@ private fun DialogBubble(message: DialogMessage) {
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
         Card(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = if (isUser) 16.dp else 4.dp,
+                bottomEnd = if (isUser) 4.dp else 16.dp
+            ),
             colors = CardDefaults.cardColors(
                 containerColor = if (isUser)
-                    MaterialTheme.colorScheme.primaryContainer
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
                 else
-                    MaterialTheme.colorScheme.surfaceVariant
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             )
         ) {
             Text(
