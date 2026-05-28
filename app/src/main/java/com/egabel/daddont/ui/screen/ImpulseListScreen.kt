@@ -283,7 +283,7 @@ private fun ImpulseCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (item.impulse.partnerGate) {
                         Badge(containerColor = PartnerBadge) {
-                            Text("♥", color = androidx.compose.ui.graphics.Color.White)
+                            Text("💬", color = androidx.compose.ui.graphics.Color.White)
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                     }
