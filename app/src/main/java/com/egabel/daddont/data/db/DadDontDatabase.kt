@@ -11,7 +11,7 @@ import com.egabel.daddont.data.model.ReturnEvent
 
 @Database(
     entities = [Impulse::class, ReturnEvent::class, DialogSession::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

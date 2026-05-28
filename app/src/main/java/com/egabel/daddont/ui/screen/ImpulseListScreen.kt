@@ -248,12 +248,22 @@ private fun ImpulseCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = ImpulseColors.label(item.state),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = borderColor,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = ImpulseColors.label(item.state),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = borderColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                    item.msUntilNext?.let { ms ->
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "· ${formatCountdown(ms)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (item.impulse.partnerGate) {
                         Badge(containerColor = PartnerBadge) {
@@ -309,5 +319,14 @@ private fun formatRelativeTime(timestamp: Long): String {
         diff < 86_400_000 -> "${diff / 3_600_000}h ago"
         diff < 604_800_000 -> "${diff / 86_400_000}d ago"
         else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
+    }
+}
+
+private fun formatCountdown(ms: Long): String {
+    val totalMin = ms / 60_000
+    return when {
+        totalMin < 60 -> "${totalMin}m left"
+        totalMin < 1440 -> "${totalMin / 60}h ${totalMin % 60}m left"
+        else -> "${totalMin / 1440}d ${(totalMin % 1440) / 60}h left"
     }
 }

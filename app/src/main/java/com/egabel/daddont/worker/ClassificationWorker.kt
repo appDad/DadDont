@@ -39,6 +39,7 @@ class ClassificationWorker(
                     impulse.copy(
                         tier = Tier.valueOf(classification.tier),
                         category = Category.valueOf(classification.category),
+                        classifiedAt = System.currentTimeMillis(),
                         partnerGate = classification.partnerGate,
                         partnerReason = classification.partnerReason.ifEmpty { null },
                         ungraded = false

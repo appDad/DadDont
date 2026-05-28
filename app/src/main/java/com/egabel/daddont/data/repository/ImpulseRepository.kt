@@ -13,7 +13,8 @@ import java.util.UUID
 
 data class ImpulseWithState(
     val impulse: Impulse,
-    val state: ImpulseState
+    val state: ImpulseState,
+    val msUntilNext: Long? = null
 )
 
 class ImpulseRepository(private val db: DadDontDatabase) {
@@ -29,7 +30,10 @@ class ImpulseRepository(private val db: DadDontDatabase) {
 
     fun observeActiveWithState(): Flow<List<ImpulseWithState>> =
         impulseDao.observeActive().map { impulses ->
-            impulses.map { ImpulseWithState(it, ImpulseStateCalculator.computeState(it)) }
+            impulses.map {
+                ImpulseWithState(it, ImpulseStateCalculator.computeState(it),
+                    ImpulseStateCalculator.msUntilNextState(it))
+            }
         }
 
     fun observeArchivedWithState(): Flow<List<ImpulseWithState>> =
@@ -39,17 +43,24 @@ class ImpulseRepository(private val db: DadDontDatabase) {
 
     fun observePartnerFlagged(): Flow<List<ImpulseWithState>> =
         impulseDao.observePartnerFlagged().map { impulses ->
-            impulses.map { ImpulseWithState(it, ImpulseStateCalculator.computeState(it)) }
+            impulses.map {
+                ImpulseWithState(it, ImpulseStateCalculator.computeState(it),
+                    ImpulseStateCalculator.msUntilNextState(it))
+            }
         }
 
     fun observeById(id: UUID): Flow<ImpulseWithState?> =
         impulseDao.observeById(id).map { impulse ->
-            impulse?.let { ImpulseWithState(it, ImpulseStateCalculator.computeState(it)) }
+            impulse?.let {
+                ImpulseWithState(it, ImpulseStateCalculator.computeState(it),
+                    ImpulseStateCalculator.msUntilNextState(it))
+            }
         }
 
     suspend fun getById(id: UUID): ImpulseWithState? {
         val impulse = impulseDao.getById(id) ?: return null
-        return ImpulseWithState(impulse, ImpulseStateCalculator.computeState(impulse))
+        return ImpulseWithState(impulse, ImpulseStateCalculator.computeState(impulse),
+            ImpulseStateCalculator.msUntilNextState(impulse))
     }
 
     suspend fun recordReturn(impulseId: UUID, rationale: String? = null) {
@@ -57,9 +68,10 @@ class ImpulseRepository(private val db: DadDontDatabase) {
         val state = ImpulseStateCalculator.computeState(impulse)
 
         if (state == ImpulseState.GRAY) {
-            // Reactivation: reset to red by updating createdAt
+            // Reactivation: reset cooling clock
+            val now = System.currentTimeMillis()
             impulseDao.update(impulse.copy(
-                createdAt = System.currentTimeMillis(),
+                classifiedAt = now,
                 reactivationCount = impulse.reactivationCount + 1,
                 dismissedAt = null,
                 dismissalType = null

@@ -11,6 +11,7 @@ data class Impulse(
     val content: String,
     val tier: Tier? = null,
     val category: Category? = null,
+    val classifiedAt: Long? = null,
     val partnerGate: Boolean = false,
     val partnerReason: String? = null,
     val ungraded: Boolean = true,

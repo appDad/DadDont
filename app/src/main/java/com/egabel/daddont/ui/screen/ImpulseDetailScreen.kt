@@ -127,12 +127,22 @@ fun ImpulseDetailScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = ImpulseColors.label(state),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = borderColor,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = ImpulseColors.label(state),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = borderColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                impulseWithState.msUntilNext?.let { ms ->
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "· ${formatCountdown(ms)}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                             if (impulse.partnerGate) {
                                 Badge(containerColor = PartnerBadge) {
                                     Text("Discuss", color = Color.White)
@@ -409,6 +419,15 @@ fun ImpulseDetailScreen(
                 }
             }
         }
+    }
+}
+
+private fun formatCountdown(ms: Long): String {
+    val totalMin = ms / 60_000
+    return when {
+        totalMin < 60 -> "${totalMin}m left"
+        totalMin < 1440 -> "${totalMin / 60}h ${totalMin % 60}m left"
+        else -> "${totalMin / 1440}d ${(totalMin % 1440) / 60}h left"
     }
 }
 
