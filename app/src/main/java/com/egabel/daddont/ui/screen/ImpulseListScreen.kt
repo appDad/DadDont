@@ -102,7 +102,12 @@ fun ImpulseListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Dad Don't") },
+                title = {
+                    Text(
+                        "Dad Don't",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                },
                 actions = {
                     IconButton(onClick = onStatsClick) {
                         Icon(Icons.Default.BarChart, contentDescription = "Stats")
