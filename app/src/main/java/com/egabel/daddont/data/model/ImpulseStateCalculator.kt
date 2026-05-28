@@ -4,7 +4,7 @@ object ImpulseStateCalculator {
     fun computeState(impulse: Impulse, now: Long = System.currentTimeMillis()): ImpulseState {
         if (impulse.dismissedAt != null) return ImpulseState.GRAY
 
-        val tier = impulse.tier ?: return ImpulseState.YELLOW
+        val tier = impulse.tier ?: return ImpulseState.PENDING
         val durations = CoolingConfig.durationsFor(tier)
         val elapsed = now - impulse.createdAt
 

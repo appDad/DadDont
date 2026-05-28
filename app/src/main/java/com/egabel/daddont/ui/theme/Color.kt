@@ -2,6 +2,8 @@ package com.egabel.daddont.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+val PendingState = Color(0xFF1E88E5)
+val PendingStateContainer = Color(0xFFBBDEFB)
 val RedState = Color(0xFFE53935)
 val RedStateContainer = Color(0xFFFFCDD2)
 val YellowState = Color(0xFFFDD835)

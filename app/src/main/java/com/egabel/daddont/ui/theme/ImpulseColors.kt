@@ -6,6 +6,7 @@ import com.egabel.daddont.data.model.ImpulseState
 
 object ImpulseColors {
     fun borderColor(state: ImpulseState): Color = when (state) {
+        ImpulseState.PENDING -> PendingState
         ImpulseState.RED -> RedState
         ImpulseState.YELLOW -> YellowState
         ImpulseState.GREEN -> GreenState
@@ -13,6 +14,7 @@ object ImpulseColors {
     }
 
     fun containerColor(state: ImpulseState): Color = when (state) {
+        ImpulseState.PENDING -> PendingStateContainer
         ImpulseState.RED -> RedStateContainer
         ImpulseState.YELLOW -> YellowStateContainer
         ImpulseState.GREEN -> GreenStateContainer
@@ -20,6 +22,7 @@ object ImpulseColors {
     }
 
     fun label(state: ImpulseState): String = when (state) {
+        ImpulseState.PENDING -> "Classifying…"
         ImpulseState.RED -> "Hot"
         ImpulseState.YELLOW -> "Cooling"
         ImpulseState.GREEN -> "Cooled"

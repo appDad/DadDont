@@ -12,4 +12,4 @@ enum class DismissalType {
     DECIDED_NOT_TO_ASK
 }
 
-enum class ImpulseState { RED, YELLOW, GREEN, GRAY }
+enum class ImpulseState { PENDING, RED, YELLOW, GREEN, GRAY }
