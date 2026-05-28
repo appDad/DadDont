@@ -78,12 +78,12 @@ private fun FirstLaunchScreen(onApiKeySaved: (String) -> Unit) {
     ) {
         Image(
             painter = painterResource(id = R.drawable.ic_logo),
-            contentDescription = "Dad Don't logo",
+            contentDescription = "DadDont logo",
             modifier = Modifier.size(96.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Dad Don't",
+            text = "DadDont",
             style = MaterialTheme.typography.headlineLarge
         )
         Spacer(modifier = Modifier.height(8.dp))

@@ -8,6 +8,7 @@ import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,8 +33,6 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -44,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -53,18 +53,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.egabel.daddont.data.model.ImpulseState
 import com.egabel.daddont.data.repository.ImpulseWithState
+import com.egabel.daddont.ui.theme.BgLight
+import com.egabel.daddont.ui.theme.BlueLeft
+import com.egabel.daddont.ui.theme.BorderColor
 import com.egabel.daddont.ui.theme.ImpulseColors
 import com.egabel.daddont.ui.theme.PartnerBadge
+import com.egabel.daddont.ui.theme.TextDim
+import com.egabel.daddont.ui.theme.TitleGradient
 import com.egabel.daddont.ui.viewmodel.ImpulseListViewModel
 import com.egabel.daddont.ui.viewmodel.ListFilter
 import java.text.SimpleDateFormat
@@ -109,20 +115,22 @@ fun ImpulseListScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Dad Don't",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
+                        text = "DadDont",
+                        style = TextStyle(
+                            brush = TitleGradient,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                ),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
                 actions = {
                     IconButton(onClick = onStatsClick) {
-                        Icon(Icons.Default.BarChart, contentDescription = "Stats")
+                        Icon(Icons.Default.BarChart, contentDescription = "Stats", tint = TextDim)
                     }
                     IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = TextDim)
                     }
                 }
             )
@@ -143,15 +151,13 @@ fun ImpulseListScreen(
                     }
                 },
                 shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = BlueLeft,
+                contentColor = Color.White
             ) {
-                Icon(
-                    Icons.Default.Mic,
-                    contentDescription = "Voice capture",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
+                Icon(Icons.Default.Mic, contentDescription = "Voice capture")
             }
-        }
+        },
+        containerColor = BgLight
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -169,17 +175,14 @@ fun ImpulseListScreen(
                     value = uiState.captureText,
                     onValueChange = viewModel::setCaptureText,
                     modifier = Modifier.weight(1f),
-                    placeholder = {
-                        Text(
-                            "What's the impulse?",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
-                    },
+                    placeholder = { Text("What's the impulse?", color = TextDim) },
                     singleLine = true,
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        focusedBorderColor = BlueLeft,
+                        unfocusedBorderColor = BorderColor,
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White
                     )
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -190,10 +193,7 @@ fun ImpulseListScreen(
                     Icon(
                         Icons.Default.Send,
                         contentDescription = "Capture",
-                        tint = if (uiState.captureText.isNotBlank())
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        tint = if (uiState.captureText.isNotBlank()) BlueLeft else TextDim
                     )
                 }
             }
@@ -205,33 +205,30 @@ fun ImpulseListScreen(
                     .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilterChip(
-                    selected = uiState.filter == ListFilter.ACTIVE,
-                    onClick = { viewModel.setFilter(ListFilter.ACTIVE) },
-                    label = { Text("Active") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                listOf(
+                    "Active" to ListFilter.ACTIVE,
+                    "Archive" to ListFilter.ARCHIVE,
+                    "To Discuss" to ListFilter.PARTNER
+                ).forEach { (label, filter) ->
+                    FilterChip(
+                        selected = uiState.filter == filter,
+                        onClick = { viewModel.setFilter(filter) },
+                        label = { Text(label, fontSize = 13.sp) },
+                        shape = RoundedCornerShape(14.dp),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = uiState.filter == filter,
+                            borderColor = BorderColor,
+                            selectedBorderColor = BlueLeft
+                        ),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Color.White,
+                            selectedContainerColor = BlueLeft.copy(alpha = 0.08f),
+                            labelColor = TextDim,
+                            selectedLabelColor = BlueLeft
+                        )
                     )
-                )
-                FilterChip(
-                    selected = uiState.filter == ListFilter.ARCHIVE,
-                    onClick = { viewModel.setFilter(ListFilter.ARCHIVE) },
-                    label = { Text("Archive") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
-                FilterChip(
-                    selected = uiState.filter == ListFilter.PARTNER,
-                    onClick = { viewModel.setFilter(ListFilter.PARTNER) },
-                    label = { Text("To Discuss") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
+                }
             }
 
             // Impulse list
@@ -249,7 +246,7 @@ fun ImpulseListScreen(
                             ListFilter.PARTNER -> "Nothing flagged for discussion yet."
                         },
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        color = TextDim
                     )
                 }
             } else {
@@ -278,68 +275,49 @@ private fun ImpulseCard(
         targetValue = ImpulseColors.borderColor(item.state),
         label = "stateColor"
     )
-    val containerColor by animateColorAsState(
-        targetValue = ImpulseColors.containerColor(item.state),
-        label = "containerColor"
-    )
 
-    val gradientBrush = Brush.horizontalGradient(
-        colors = listOf(
-            containerColor.copy(alpha = 0.5f),
-            MaterialTheme.colorScheme.surface
-        )
-    )
-
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+        shape = RoundedCornerShape(14.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, BorderColor)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(gradientBrush)
-        ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
             // Left accent bar
             Box(
                 modifier = Modifier
                     .width(4.dp)
-                    .height(100.dp)
-                    .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
+                    .height(88.dp)
                     .background(stateColor)
-                    .align(Alignment.CenterStart)
             )
 
-            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp)) {
+            Column(modifier = Modifier.padding(14.dp).weight(1f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // State dot
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
                                 .background(stateColor)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = ImpulseColors.label(item.state),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = stateColor,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = stateColor
                         )
                         item.msUntilNext?.let { ms ->
-                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "· ${formatCountdown(ms)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                text = " · ${formatCountdown(ms)}",
+                                fontSize = 11.sp,
+                                color = TextDim
                             )
                         }
                     }
@@ -348,29 +326,31 @@ private fun ImpulseCard(
                             Icon(
                                 imageVector = Icons.Outlined.ChatBubbleOutline,
                                 contentDescription = "Discuss with partner",
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(15.dp),
                                 tint = PartnerBadge
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                         }
                         if (item.impulse.returnCount > 0) {
                             Text(
                                 text = "${item.impulse.returnCount}x",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                fontWeight = FontWeight.Medium
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = TextDim
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
                     text = item.impulse.content,
-                    style = MaterialTheme.typography.bodyLarge,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Normal,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -381,13 +361,13 @@ private fun ImpulseCard(
                 ) {
                     Text(
                         text = item.impulse.tier?.name ?: "Ungraded",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        fontSize = 11.sp,
+                        color = TextDim
                     )
                     Text(
                         text = formatRelativeTime(item.impulse.createdAt),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        fontSize = 11.sp,
+                        color = TextDim
                     )
                 }
             }

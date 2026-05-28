@@ -1,10 +1,10 @@
 package com.egabel.daddont.ui.screen
 
 import android.accounts.AccountManager
-import android.app.Activity
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,24 +13,26 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LinkOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,18 +41,27 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.egabel.daddont.Prefs
 import com.egabel.daddont.api.tasks.AuthResult
 import com.egabel.daddont.api.tasks.GoogleTasksClient
+import com.egabel.daddont.ui.theme.BgLight
+import com.egabel.daddont.ui.theme.BlueLeft
+import com.egabel.daddont.ui.theme.BorderColor
+import com.egabel.daddont.ui.theme.GreenState
+import com.egabel.daddont.ui.theme.TextDim
+import com.egabel.daddont.ui.theme.TextMid
+import com.egabel.daddont.ui.theme.TitleGradient
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
     val scope = rememberCoroutineScope()
     val tasksClient = GoogleTasksClient(context)
@@ -107,40 +118,58 @@ fun SettingsScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = {
+                    Text(
+                        text = "Settings",
+                        style = TextStyle(
+                            brush = TitleGradient,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = TextDim
+                        )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
-        }
+        },
+        containerColor = BgLight
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Gemini API Key
-            Card(
+            // ── Gemini API Key ───────────────────────────────────────────
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                shape = RoundedCornerShape(14.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, BorderColor)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Gemini API Key",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextMid
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Used for impulse classification and Talk Me Down",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontSize = 12.sp,
+                        color = TextDim
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
@@ -148,40 +177,55 @@ fun SettingsScreen(onBack: () -> Unit) {
                         onValueChange = { geminiKey = it },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text("API Key") }
+                        placeholder = { Text("API Key", color = TextDim) },
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BlueLeft,
+                            unfocusedBorderColor = BorderColor,
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White
+                        )
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
                         onClick = {
                             prefs.edit().putString(Prefs.KEY_GEMINI_API_KEY, geminiKey.trim()).apply()
                         },
-                        enabled = geminiKey.isNotBlank()
+                        enabled = geminiKey.isNotBlank(),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            if (geminiKey.isNotBlank()) BlueLeft else BorderColor
+                        )
                     ) {
-                        Text("Save")
+                        Text(
+                            "Save",
+                            fontSize = 13.sp,
+                            color = if (geminiKey.isNotBlank()) BlueLeft else TextDim
+                        )
                     }
                 }
             }
 
-            HorizontalDivider()
-
-            // Google Tasks / DadDo
-            Card(
+            // ── Google Tasks / DadDo ─────────────────────────────────────
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                shape = RoundedCornerShape(14.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, BorderColor)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Google Tasks (DadDo)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextMid
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Link your Google account to move cooled impulses into DadDo",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontSize = 12.sp,
+                        color = TextDim
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -190,20 +234,22 @@ fun SettingsScreen(onBack: () -> Unit) {
                             Icon(
                                 Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = GreenState,
+                                modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
                                     text = linkedAccount!!,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = TextMid
                                 )
                                 if (accountStatus.isNotEmpty()) {
                                     Text(
                                         text = accountStatus,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        fontSize = 12.sp,
+                                        color = TextDim
                                     )
                                 }
                             }
@@ -213,9 +259,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                             OutlinedButton(
                                 onClick = {
                                     accountPickerLauncher.launch(tasksClient.buildAccountPickerIntent())
-                                }
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, BorderColor)
                             ) {
-                                Text("Change Account")
+                                Text("Change Account", fontSize = 13.sp, color = TextMid)
                             }
                             OutlinedButton(
                                 onClick = {
@@ -225,20 +273,29 @@ fun SettingsScreen(onBack: () -> Unit) {
                                         .apply()
                                     linkedAccount = null
                                     accountStatus = ""
-                                }
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, BorderColor)
                             ) {
-                                Icon(Icons.Default.LinkOff, contentDescription = null)
+                                Icon(
+                                    Icons.Default.LinkOff,
+                                    contentDescription = null,
+                                    tint = TextDim,
+                                    modifier = Modifier.size(16.dp)
+                                )
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Unlink")
+                                Text("Unlink", fontSize = 13.sp, color = TextMid)
                             }
                         }
                     } else {
-                        Button(
+                        OutlinedButton(
                             onClick = {
                                 accountPickerLauncher.launch(tasksClient.buildAccountPickerIntent())
-                            }
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            border = BorderStroke(1.dp, BlueLeft)
                         ) {
-                            Text("Link Google Account")
+                            Text("Link Google Account", fontSize = 13.sp, color = BlueLeft)
                         }
                     }
                 }

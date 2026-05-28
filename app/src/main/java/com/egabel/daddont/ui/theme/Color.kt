@@ -2,23 +2,19 @@ package com.egabel.daddont.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val PendingState = Color(0xFF1E88E5)
-val PendingStateContainer = Color(0xFFBBDEFB)
-val RedState = Color(0xFFE53935)
-val RedStateContainer = Color(0xFFFFCDD2)
-val YellowState = Color(0xFFFDD835)
-val YellowStateContainer = Color(0xFFFFF9C4)
-val GreenState = Color(0xFF43A047)
-val GreenStateContainer = Color(0xFFC8E6C9)
-val GrayState = Color(0xFF9E9E9E)
-val GrayStateContainer = Color(0xFFE0E0E0)
+// ── State colors (border / accent) ───────────────────────────────────────────
+val PendingState  = Color(0xFF5B8DEF)   // Soft blue — waiting for LLM
+val RedState      = Color(0xFFE05C5C)   // Hot
+val YellowState   = Color(0xFFE59933)   // Cooling (amber, not harsh yellow)
+val GreenState    = Color(0xFF2FA36C)   // Cooled
+val GrayState     = Color(0xFF9EA8BE)   // Archived
 
-val PartnerBadge = Color(0xFF7B1FA2)
+// ── State container tints (very subtle backgrounds) ──────────────────────────
+val PendingStateContainer  = Color(0xFFE8F0FE)
+val RedStateContainer      = Color(0xFFFDECEC)
+val YellowStateContainer   = Color(0xFFFFF4E5)
+val GreenStateContainer    = Color(0xFFE6F5ED)
+val GrayStateContainer     = Color(0xFFEFF1F5)
 
-val DarkBackground = Color(0xFF121212)
-val DarkSurface = Color(0xFF1E1E1E)
-val DarkSurfaceVariant = Color(0xFF2C2C2C)
-
-val LightBackground = Color(0xFFFAFAFA)
-val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFF5F5F5)
+// ── Partner badge ────────────────────────────────────────────────────────────
+val PartnerBadge = Color(0xFF6F69AF)   // Purple from gradient — family tie-in

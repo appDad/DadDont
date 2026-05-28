@@ -1,6 +1,7 @@
 package com.egabel.daddont.ui.screen
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,24 +24,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -55,17 +54,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.egabel.daddont.data.model.DismissalType
 import com.egabel.daddont.data.model.ImpulseState
+import com.egabel.daddont.ui.theme.BgLight
+import com.egabel.daddont.ui.theme.BlueLeft
+import com.egabel.daddont.ui.theme.BorderColor
 import com.egabel.daddont.ui.theme.ImpulseColors
 import com.egabel.daddont.ui.theme.PartnerBadge
+import com.egabel.daddont.ui.theme.PurpleRight
+import com.egabel.daddont.ui.theme.TextDim
+import com.egabel.daddont.ui.theme.TextMid
+import com.egabel.daddont.ui.theme.TitleGradient
 import com.egabel.daddont.ui.viewmodel.DialogMessage
 import com.egabel.daddont.ui.viewmodel.ImpulseDetailViewModel
 import java.text.SimpleDateFormat
@@ -80,7 +87,6 @@ fun ImpulseDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
     var showReturnDialog by remember { mutableStateOf(false) }
     var returnRationale by remember { mutableStateOf("") }
 
@@ -94,18 +100,31 @@ fun ImpulseDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Impulse") },
+                title = {
+                    Text(
+                        text = "Impulse",
+                        style = TextStyle(
+                            brush = TitleGradient,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = TextDim
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = BgLight
     ) { paddingValues ->
         val impulseWithState = uiState.impulseWithState
         if (impulseWithState == null) {
@@ -114,36 +133,37 @@ fun ImpulseDetailScreen(
 
         val impulse = impulseWithState.impulse
         val state = impulseWithState.state
-        val stateColor = ImpulseColors.borderColor(state)
-        val containerColor = ImpulseColors.containerColor(state)
+        val stateColor by animateColorAsState(
+            targetValue = ImpulseColors.borderColor(state),
+            label = "stateColor"
+        )
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header card with gradient
+            // ── Header card ──────────────────────────────────────────────
             item {
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, BorderColor)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        containerColor.copy(alpha = 0.6f),
-                                        MaterialTheme.colorScheme.surface
-                                    )
-                                )
-                            )
-                    ) {
-                        Column(modifier = Modifier.padding(20.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        // Left accent bar
+                        Box(
+                            modifier = Modifier
+                                .width(4.dp)
+                                .height(160.dp)
+                                .background(stateColor)
+                        )
+
+                        Column(modifier = Modifier.padding(16.dp).weight(1f)) {
+                            // State row
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -152,23 +172,22 @@ fun ImpulseDetailScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         modifier = Modifier
-                                            .size(10.dp)
+                                            .size(8.dp)
                                             .clip(CircleShape)
                                             .background(stateColor)
                                     )
-                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = ImpulseColors.label(state),
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = stateColor,
-                                        fontWeight = FontWeight.Bold
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = stateColor
                                     )
                                     impulseWithState.msUntilNext?.let { ms ->
-                                        Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "· ${formatCountdown(ms)}",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            text = " · ${formatCountdown(ms)}",
+                                            fontSize = 12.sp,
+                                            color = TextDim
                                         )
                                     }
                                 }
@@ -177,235 +196,283 @@ fun ImpulseDetailScreen(
                                         Icon(
                                             imageVector = Icons.Outlined.ChatBubbleOutline,
                                             contentDescription = "Discuss with partner",
-                                            modifier = Modifier.size(18.dp),
+                                            modifier = Modifier.size(15.dp),
                                             tint = PartnerBadge
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
                                             text = "Discuss",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = PartnerBadge,
-                                            fontWeight = FontWeight.Medium
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = PartnerBadge
                                         )
                                     }
                                 }
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Impulse content
                             Text(
                                 text = impulse.content,
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Medium
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Metadata row
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Text(
                                     text = impulse.tier?.name ?: "Ungraded",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    fontSize = 11.sp,
+                                    color = TextDim
                                 )
                                 Text(
                                     text = impulse.category?.name ?: "",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    fontSize = 11.sp,
+                                    color = TextDim
                                 )
                                 Text(
                                     text = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
                                         .format(Date(impulse.createdAt)),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    fontSize = 11.sp,
+                                    color = TextDim
                                 )
                             }
+
                             if (impulse.partnerGate && impulse.partnerReason != null) {
-                                Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = impulse.partnerReason,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 12.sp,
                                     fontStyle = FontStyle.Italic,
                                     color = PartnerBadge.copy(alpha = 0.8f)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
                             Text(
                                 text = "Returned ${impulse.returnCount}x · Reactivated ${impulse.reactivationCount}x",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                fontSize = 11.sp,
+                                color = TextDim
                             )
                         }
                     }
                 }
             }
 
-            // Actions
+            // ── Actions card ─────────────────────────────────────────────
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (state != ImpulseState.GRAY) {
-                        if (!showReturnDialog) {
-                            OutlinedButton(
-                                onClick = { showReturnDialog = true },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Impulse returned")
-                            }
-                        } else {
-                            Card(
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                )
-                            ) {
-                                Column(modifier = Modifier.padding(14.dp)) {
-                                    OutlinedTextField(
-                                        value = returnRationale,
-                                        onValueChange = { returnRationale = it },
-                                        label = { Text("Why still want this? (optional)") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true,
-                                        shape = RoundedCornerShape(12.dp)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, BorderColor)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        if (state != ImpulseState.GRAY) {
+                            if (!showReturnDialog) {
+                                OutlinedButton(
+                                    onClick = { showReturnDialog = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, BorderColor)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        tint = TextMid,
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Button(
-                                            onClick = {
-                                                viewModel.recordReturn(returnRationale.ifBlank { null })
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Impulse returned", color = TextMid, fontSize = 14.sp)
+                                }
+                            } else {
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = BgLight,
+                                    border = BorderStroke(1.dp, BorderColor)
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        OutlinedTextField(
+                                            value = returnRationale,
+                                            onValueChange = { returnRationale = it },
+                                            placeholder = {
+                                                Text("Why still want this? (optional)", color = TextDim)
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            shape = RoundedCornerShape(14.dp),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = BlueLeft,
+                                                unfocusedBorderColor = BorderColor,
+                                                focusedContainerColor = Color.White,
+                                                unfocusedContainerColor = Color.White
+                                            )
+                                        )
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    viewModel.recordReturn(returnRationale.ifBlank { null })
+                                                    returnRationale = ""
+                                                    showReturnDialog = false
+                                                },
+                                                shape = RoundedCornerShape(14.dp),
+                                                border = BorderStroke(1.dp, BlueLeft)
+                                            ) {
+                                                Text("Record", color = BlueLeft, fontSize = 13.sp)
+                                            }
+                                            TextButton(onClick = {
                                                 returnRationale = ""
                                                 showReturnDialog = false
-                                            },
-                                            shape = RoundedCornerShape(10.dp)
-                                        ) { Text("Record") }
-                                        TextButton(onClick = {
-                                            returnRationale = ""
-                                            showReturnDialog = false
-                                        }) { Text("Cancel") }
+                                            }) {
+                                                Text("Cancel", color = TextDim, fontSize = 13.sp)
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    if (state == ImpulseState.GRAY && impulse.dismissedAt != null) {
-                        OutlinedButton(
-                            onClick = { viewModel.recordReturn() },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Reactivate")
-                        }
-                    }
-
-                    if (state == ImpulseState.GREEN) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        Text(
-                            text = "Cooled — your call",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        if (impulse.partnerGate) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                AssistChip(
-                                    onClick = { viewModel.dismiss(DismissalType.PARTNER_APPROVED) },
-                                    label = { Text("Love of your life approved") }
-                                )
-                                AssistChip(
-                                    onClick = { viewModel.dismiss(DismissalType.PARTNER_DECLINED) },
-                                    label = { Text("Love of your life declined") }
-                                )
-                                AssistChip(
-                                    onClick = { viewModel.dismiss(DismissalType.DECIDED_NOT_TO_ASK) },
-                                    label = { Text("Decided not to ask") }
-                                )
-                            }
-                        } else {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                AssistChip(
-                                    onClick = { viewModel.dismiss(DismissalType.DONE) },
-                                    label = { Text("Done / Executed") }
-                                )
-                                AssistChip(
-                                    onClick = { viewModel.dismiss(DismissalType.NO_LONGER_WANT) },
-                                    label = { Text("No longer want") }
-                                )
-                            }
-                        }
-
-                        if (!uiState.sentToDadDo) {
-                            Button(
-                                onClick = { viewModel.sendToDadDo() },
+                        if (state == ImpulseState.GRAY && impulse.dismissedAt != null) {
+                            OutlinedButton(
+                                onClick = { viewModel.recordReturn() },
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondary
-                                )
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, BorderColor)
                             ) {
-                                Text("Move to DadDo")
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    tint = TextMid,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Reactivate", color = TextMid, fontSize = 14.sp)
                             }
-                        } else {
+                        }
+
+                        if (state == ImpulseState.GREEN) {
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Sent to DadDo",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontStyle = FontStyle.Italic
+                                text = "Cooled — your call",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = ImpulseColors.borderColor(ImpulseState.GREEN)
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            if (impulse.partnerGate) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    DismissChip("Love of your life approved") {
+                                        viewModel.dismiss(DismissalType.PARTNER_APPROVED)
+                                    }
+                                    DismissChip("Love of your life declined") {
+                                        viewModel.dismiss(DismissalType.PARTNER_DECLINED)
+                                    }
+                                    DismissChip("Decided not to ask") {
+                                        viewModel.dismiss(DismissalType.DECIDED_NOT_TO_ASK)
+                                    }
+                                }
+                            } else {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    DismissChip("Done / Executed") {
+                                        viewModel.dismiss(DismissalType.DONE)
+                                    }
+                                    DismissChip("No longer want") {
+                                        viewModel.dismiss(DismissalType.NO_LONGER_WANT)
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            if (!uiState.sentToDadDo) {
+                                OutlinedButton(
+                                    onClick = { viewModel.sendToDadDo() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, PurpleRight)
+                                ) {
+                                    Text("Move to DadDo", color = PurpleRight, fontSize = 14.sp)
+                                }
+                            } else {
+                                Text(
+                                    text = "Sent to DadDo ✓",
+                                    fontSize = 12.sp,
+                                    color = TextDim,
+                                    fontStyle = FontStyle.Italic
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        TextButton(onClick = { viewModel.togglePartnerFlag() }) {
+                            Icon(
+                                imageVector = Icons.Outlined.ChatBubbleOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = if (impulse.partnerGate) PartnerBadge else TextDim
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (impulse.partnerGate) "Remove partner flag" else "Needs their blessing",
+                                fontSize = 13.sp,
+                                color = if (impulse.partnerGate) PartnerBadge else TextMid
                             )
                         }
-                    }
-
-                    TextButton(onClick = { viewModel.togglePartnerFlag() }) {
-                        Icon(
-                            imageVector = Icons.Outlined.ChatBubbleOutline,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = if (impulse.partnerGate) PartnerBadge
-                                   else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (impulse.partnerGate) "Remove partner flag" else "Needs their blessing")
                     }
                 }
             }
 
-            // Talk Me Down section
+            // ── Talk Me Down ─────────────────────────────────────────────
             item {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                val shouldSuggest = impulse.returnCount >= 3 && !uiState.showTalkMeDown
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, BorderColor)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        val shouldSuggest = impulse.returnCount >= 3 && !uiState.showTalkMeDown
                         TextButton(onClick = { viewModel.toggleTalkMeDown() }) {
                             Icon(
                                 Icons.Outlined.ChatBubbleOutline,
                                 contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp),
+                                tint = BlueLeft
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Talk me through this")
+                            Text(
+                                text = if (uiState.showTalkMeDown) "Hide dialog" else "Talk me through this",
+                                fontSize = 13.sp,
+                                color = BlueLeft
+                            )
                         }
-                    }
-                    if (shouldSuggest) {
-                        Text(
-                            text = "You've returned to this ${impulse.returnCount} times. Want to talk it through?",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(start = 12.dp)
-                        )
+                        if (shouldSuggest) {
+                            Text(
+                                text = "You've returned to this ${impulse.returnCount} times. Want to talk it through?",
+                                fontSize = 12.sp,
+                                color = TextDim,
+                                modifier = Modifier.padding(start = 12.dp, top = 4.dp)
+                            )
+                        }
                     }
                 }
             }
 
-            // Dialog conversation
+            // ── Dialog conversation ──────────────────────────────────────
             if (uiState.showTalkMeDown) {
                 items(uiState.dialogMessages) { message ->
                     DialogBubble(message)
@@ -413,10 +480,20 @@ fun ImpulseDetailScreen(
 
                 if (uiState.isDialogLoading) {
                     item {
-                        CircularProgressIndicator(
-                            modifier = Modifier.padding(16.dp),
-                            strokeWidth = 2.dp
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.Start
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = BlueLeft
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Thinking…", fontSize = 12.sp, color = TextDim)
+                        }
                     }
                 }
 
@@ -429,57 +506,108 @@ fun ImpulseDetailScreen(
                             value = uiState.dialogInput,
                             onValueChange = viewModel::setDialogInput,
                             modifier = Modifier.weight(1f),
-                            placeholder = { Text("What are you thinking?") },
+                            placeholder = { Text("What are you thinking?", color = TextDim) },
                             singleLine = true,
-                            shape = RoundedCornerShape(24.dp)
+                            shape = RoundedCornerShape(14.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BlueLeft,
+                                unfocusedBorderColor = BorderColor,
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White
+                            )
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         IconButton(
                             onClick = viewModel::sendDialogMessage,
                             enabled = uiState.dialogInput.isNotBlank() && !uiState.isDialogLoading
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send",
+                                tint = if (uiState.dialogInput.isNotBlank()) BlueLeft else TextDim
+                            )
                         }
                     }
                 }
             }
 
-            // Return history
+            // ── Return history ───────────────────────────────────────────
             if (uiState.returnEvents.isNotEmpty()) {
                 item {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    Text(
-                        text = "Return History",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                }
-                items(uiState.returnEvents) { event ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, BorderColor)
                     ) {
-                        Text(
-                            text = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
-                                .format(Date(event.timestamp)),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                        if (event.rationale != null) {
-                            Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = event.rationale,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontStyle = FontStyle.Italic
+                                text = "Return History",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextMid
                             )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            uiState.returnEvents.forEach { event ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(5.dp)
+                                            .clip(CircleShape)
+                                            .background(TextDim)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = SimpleDateFormat(
+                                            "MMM d, h:mm a",
+                                            Locale.getDefault()
+                                        ).format(Date(event.timestamp)),
+                                        fontSize = 11.sp,
+                                        color = TextDim
+                                    )
+                                    if (event.rationale != null) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = event.rationale,
+                                            fontSize = 12.sp,
+                                            fontStyle = FontStyle.Italic,
+                                            color = TextMid
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DismissChip(label: String, onClick: () -> Unit) {
+    FilterChip(
+        selected = false,
+        onClick = onClick,
+        label = { Text(label, fontSize = 12.sp) },
+        shape = RoundedCornerShape(14.dp),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = false,
+            borderColor = BorderColor,
+            selectedBorderColor = BlueLeft
+        ),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = Color.White,
+            labelColor = TextMid
+        )
+    )
 }
 
 private fun formatCountdown(ms: Long): String {
@@ -497,27 +625,24 @@ private fun DialogBubble(message: DialogMessage) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 3.dp),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
-        Card(
+        Surface(
             shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (isUser) 16.dp else 4.dp,
-                bottomEnd = if (isUser) 4.dp else 16.dp
+                topStart = 14.dp,
+                topEnd = 14.dp,
+                bottomStart = if (isUser) 14.dp else 4.dp,
+                bottomEnd = if (isUser) 4.dp else 14.dp
             ),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isUser)
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                else
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            )
+            color = if (isUser) BlueLeft.copy(alpha = 0.08f) else BgLight,
+            border = BorderStroke(1.dp, if (isUser) BlueLeft.copy(alpha = 0.2f) else BorderColor)
         ) {
             Text(
                 text = message.content,
                 modifier = Modifier.padding(12.dp),
-                style = MaterialTheme.typography.bodyMedium
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
