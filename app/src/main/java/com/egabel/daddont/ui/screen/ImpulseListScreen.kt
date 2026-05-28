@@ -51,10 +51,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.egabel.daddont.R
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.egabel.daddont.data.model.ImpulseState
 import com.egabel.daddont.data.repository.ImpulseWithState
@@ -103,10 +105,19 @@ fun ImpulseListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        "Dad Don't",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_logo),
+                            contentDescription = "Dad Don't logo",
+                            modifier = Modifier.size(36.dp),
+                            tint = androidx.compose.ui.graphics.Color.Unspecified
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            "Dad Don't",
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                    }
                 },
                 actions = {
                     IconButton(onClick = onStatsClick) {
