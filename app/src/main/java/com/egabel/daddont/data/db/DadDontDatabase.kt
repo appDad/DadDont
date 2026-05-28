@@ -11,7 +11,7 @@ import com.egabel.daddont.data.model.ReturnEvent
 
 @Database(
     entities = [Impulse::class, ReturnEvent::class, DialogSession::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -30,7 +30,8 @@ abstract class DadDontDatabase : RoomDatabase() {
                     context.applicationContext,
                     DadDontDatabase::class.java,
                     "daddont.db"
-                ).build().also { INSTANCE = it }
+                ).fallbackToDestructiveMigration(dropAllTables = true)
+                 .build().also { INSTANCE = it }
             }
         }
     }
