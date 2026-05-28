@@ -1,85 +1,58 @@
 package com.egabel.daddont.api.gemini
 
-import com.egabel.daddont.BuildConfig
+import android.content.Context
+import android.util.Log
+import com.egabel.daddont.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-class GeminiClient {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
-
-    private val json = Json { ignoreUnknownKeys = true }
-    private val mediaType = "application/json".toMediaType()
-
-    suspend fun classify(impulseText: String): GeminiClassification = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GEMINI_API_KEY
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
-
-        val requestBody = buildClassificationRequest(impulseText)
-        val request = Request.Builder()
-            .url(url)
-            .post(requestBody.toRequestBody(mediaType))
-            .build()
-
-        val response = client.newCall(request).execute()
-        val body = response.body?.string() ?: throw Exception("Empty response from Gemini")
-
-        if (!response.isSuccessful) {
-            throw Exception("Gemini API error ${response.code}: $body")
-        }
-
-        parseClassificationResponse(body)
-    }
-
-    private fun buildClassificationRequest(impulseText: String): String {
-        val systemPrompt = CLASSIFICATION_SYSTEM_PROMPT
-        val userPrompt = "Classify this impulse: \"$impulseText\""
-
-        return """
-        {
-            "system_instruction": {
-                "parts": [{"text": ${Json.encodeToString(kotlinx.serialization.serializer<String>(), systemPrompt)}}]
-            },
-            "contents": [
-                {
-                    "parts": [{"text": ${Json.encodeToString(kotlinx.serialization.serializer<String>(), userPrompt)}}]
-                }
-            ],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "responseSchema": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "tier": {"type": "STRING", "enum": ["LOW", "MEDIUM", "HIGH"]},
-                        "category": {"type": "STRING", "enum": ["PURCHASE", "IDEA", "COMMUNICATION", "COMMITMENT", "OTHER"]},
-                        "ramonaGate": {"type": "BOOLEAN"},
-                        "ramonaReason": {"type": "STRING"}
-                    },
-                    "required": ["tier", "category", "ramonaGate"]
-                }
-            }
-        }
-        """.trimIndent()
-    }
-
-    private fun parseClassificationResponse(responseBody: String): GeminiClassification {
-        val parsed = json.decodeFromString<GeminiResponse>(responseBody)
-        val text = parsed.candidates.firstOrNull()
-            ?.content?.parts?.firstOrNull()?.text
-            ?: throw Exception("No content in Gemini response")
-        return json.decodeFromString<GeminiClassification>(text)
-    }
+class GeminiClient(private val context: Context) {
 
     companion object {
-        private val CLASSIFICATION_SYSTEM_PROMPT = """
+        private const val TAG = "GeminiApi"
+    }
+
+    private fun storedApiKey(): String =
+        context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+            .getString(Prefs.KEY_GEMINI_API_KEY, null)
+            ?.trim()
+            .orEmpty()
+
+    @Serializable private data class Part(val text: String)
+    @Serializable private data class Content(val parts: List<Part>)
+    @Serializable private data class GeminiRequest(val contents: List<Content>)
+
+    private val http = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+    private val json = Json { ignoreUnknownKeys = true }
+    private val jsonMedia = "application/json; charset=utf-8".toMediaType()
+    private val apiUrls = listOf(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    )
+
+    data class ClassificationResult(
+        val tier: String,
+        val category: String,
+        val ramonaGate: Boolean,
+        val ramonaReason: String
+    )
+
+    suspend fun classify(impulseText: String): ClassificationResult? = withContext(Dispatchers.IO) {
+        val prompt = """
 You are a classification engine for an impulse-control app. Given an impulse description, return a JSON object with:
 
 1. "tier" — stakes/consequence level:
@@ -96,16 +69,74 @@ You are a classification engine for an impulse-control app. Given an impulse des
    - Vacations, trips, family time
    - Shared funds, large discretionary spend
    - Anything affecting shared calendar/time
-
    Personal (flag false):
    - Watches, maker/DIY purchases under threshold
    - Work-related decisions
    - Personal hobbies, individual time
    - Minor consumables
 
-4. "ramonaReason" — if ramonaGate is true, a short explanation of why (e.g., "affects shared funds"). Empty string if false.
+4. "ramonaReason" — if ramonaGate is true, a short explanation of why. Empty string if false.
 
-Return ONLY valid JSON matching the schema. No markdown, no explanation.
+Return ONLY raw JSON. No markdown fences, no explanation.
+
+Impulse: "$impulseText"
         """.trimIndent()
+
+        val responseText = callGemini(prompt) ?: return@withContext null
+
+        runCatching {
+            val obj = json.parseToJsonElement(responseText.stripFences()).jsonObject
+            val tier = obj["tier"]?.jsonPrimitive?.content ?: return@runCatching null
+            val category = obj["category"]?.jsonPrimitive?.content ?: return@runCatching null
+            val ramonaGate = obj["ramonaGate"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
+            val ramonaReason = obj["ramonaReason"]?.jsonPrimitive?.content ?: ""
+
+            ClassificationResult(tier, category, ramonaGate, ramonaReason)
+        }.onFailure {
+            Log.e(TAG, "JSON parse failed: $responseText", it)
+        }.getOrNull()
     }
+
+    fun callGemini(prompt: String): String? {
+        val apiKey = storedApiKey()
+        if (apiKey.isBlank()) {
+            Log.w(TAG, "No Gemini API key configured")
+            return null
+        }
+
+        val bodyStr = json.encodeToString(
+            GeminiRequest(listOf(Content(listOf(Part(prompt)))))
+        )
+
+        for (url in apiUrls) {
+            val body = bodyStr.toRequestBody(jsonMedia)
+            val request = Request.Builder()
+                .url("$url?key=$apiKey")
+                .post(body)
+                .build()
+
+            val result = runCatching {
+                http.newCall(request).execute().use { response ->
+                    val responseBody = response.body?.string() ?: return@use null
+                    if (!response.isSuccessful) {
+                        Log.w(TAG, "Gemini $url failed: ${response.code}")
+                        return@use null
+                    }
+                    json.parseToJsonElement(responseBody).jsonObject["candidates"]
+                        ?.jsonArray?.firstOrNull()?.jsonObject
+                        ?.get("content")?.jsonObject
+                        ?.get("parts")?.jsonArray?.firstOrNull()?.jsonObject
+                        ?.get("text")?.jsonPrimitive?.content
+                }
+            }.getOrNull()
+
+            if (result != null) return result
+            Log.d(TAG, "Falling back to next model...")
+        }
+        Log.e(TAG, "All Gemini models failed")
+        return null
+    }
+
+    private fun String.stripFences() =
+        trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
 }

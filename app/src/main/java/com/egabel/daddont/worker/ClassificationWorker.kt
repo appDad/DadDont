@@ -22,7 +22,7 @@ class ClassificationWorker(
     override suspend fun doWork(): Result {
         val db = (applicationContext as DadDontApp).database
         val repository = ImpulseRepository(db)
-        val gemini = GeminiClient()
+        val gemini = GeminiClient(applicationContext)
 
         val ungraded = repository.getUngraded()
         if (ungraded.isEmpty()) return Result.success()
@@ -31,6 +31,10 @@ class ClassificationWorker(
         for (impulse in ungraded) {
             try {
                 val classification = gemini.classify(impulse.content)
+                if (classification == null) {
+                    failures++
+                    continue
+                }
                 repository.updateClassification(
                     impulse.copy(
                         tier = Tier.valueOf(classification.tier),
@@ -41,7 +45,7 @@ class ClassificationWorker(
                     )
                 )
             } catch (e: Exception) {
-                Log.e("ClassificationWorker", "Failed to classify impulse ${impulse.id}", e)
+                Log.e(TAG, "Failed to classify impulse ${impulse.id}", e)
                 failures++
             }
         }
@@ -50,6 +54,7 @@ class ClassificationWorker(
     }
 
     companion object {
+        private const val TAG = "ClassificationWorker"
         private const val WORK_NAME = "impulse_classification"
 
         fun enqueue(context: Context) {

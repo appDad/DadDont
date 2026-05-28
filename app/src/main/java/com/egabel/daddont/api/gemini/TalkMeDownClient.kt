@@ -1,24 +1,13 @@
 package com.egabel.daddont.api.gemini
 
-import com.egabel.daddont.BuildConfig
+import android.content.Context
 import com.egabel.daddont.data.model.ReturnEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
 
-class TalkMeDownClient {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .build()
+class TalkMeDownClient(private val context: Context) {
 
-    private val json = Json { ignoreUnknownKeys = true }
-    private val mediaType = "application/json".toMediaType()
+    private val gemini = GeminiClient(context)
 
     suspend fun chat(
         impulseText: String,
@@ -26,31 +15,19 @@ class TalkMeDownClient {
         priorTranscript: String?,
         userMessage: String
     ): String = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GEMINI_API_KEY
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+        val systemContext = buildSystemContext(impulseText, returnLog, priorTranscript)
+        val prompt = """
+$systemContext
 
-        val systemPrompt = buildSystemPrompt(impulseText, returnLog, priorTranscript)
-        val requestBody = buildChatRequest(systemPrompt, userMessage)
+User says: "$userMessage"
 
-        val request = Request.Builder()
-            .url(url)
-            .post(requestBody.toRequestBody(mediaType))
-            .build()
+Respond as described above. ONLY plain text, no JSON, no markdown fences.
+        """.trimIndent()
 
-        val response = client.newCall(request).execute()
-        val body = response.body?.string() ?: throw Exception("Empty response from Gemini")
-
-        if (!response.isSuccessful) {
-            throw Exception("Gemini API error ${response.code}: $body")
-        }
-
-        val parsed = json.decodeFromString<GeminiResponse>(body)
-        parsed.candidates.firstOrNull()
-            ?.content?.parts?.firstOrNull()?.text
-            ?: "I couldn't formulate a response. Try again?"
+        gemini.callGemini(prompt) ?: "I couldn't formulate a response. Try again?"
     }
 
-    private fun buildSystemPrompt(
+    private fun buildSystemContext(
         impulseText: String,
         returnLog: List<ReturnEvent>,
         priorTranscript: String?
@@ -58,10 +35,10 @@ class TalkMeDownClient {
         val returnHistory = if (returnLog.isEmpty()) {
             "No prior returns."
         } else {
-            returnLog.joinToString("\n") { event ->
+            returnLog.mapIndexed { i, event ->
                 val reason = event.rationale?.let { " — \"$it\"" } ?: ""
-                "  Return #${returnLog.indexOf(event) + 1}$reason"
-            }
+                "  Return #${i + 1}$reason"
+            }.joinToString("\n")
         }
 
         val priorContext = if (priorTranscript != null) {
@@ -83,21 +60,6 @@ Your approach:
 - If they have good reasons this time, acknowledge it
 - Keep responses conversational and under 150 words
 - Don't be preachy or use clichés
-        """.trimIndent()
-    }
-
-    private fun buildChatRequest(systemPrompt: String, userMessage: String): String {
-        return """
-        {
-            "system_instruction": {
-                "parts": [{"text": ${Json.encodeToString(kotlinx.serialization.serializer<String>(), systemPrompt)}}]
-            },
-            "contents": [
-                {
-                    "parts": [{"text": ${Json.encodeToString(kotlinx.serialization.serializer<String>(), userMessage)}}]
-                }
-            ]
-        }
         """.trimIndent()
     }
 }

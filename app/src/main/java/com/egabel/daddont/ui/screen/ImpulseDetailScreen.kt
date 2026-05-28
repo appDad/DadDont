@@ -1,6 +1,5 @@
 package com.egabel.daddont.ui.screen
 
-import android.app.Activity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -285,7 +284,7 @@ fun ImpulseDetailScreen(
 
                         if (!uiState.sentToDadDo) {
                             Button(
-                                onClick = { viewModel.sendToDadDo(context as Activity) },
+                                onClick = { viewModel.sendToDadDo() },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.secondary

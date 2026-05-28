@@ -2,123 +2,144 @@ package com.egabel.daddont.api.tasks
 
 import android.accounts.Account
 import android.accounts.AccountManager
-import android.app.Activity
 import android.content.Context
-import android.os.Bundle
+import android.content.Intent
+import android.util.Log
+import com.egabel.daddont.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 class GoogleTasksClient(private val context: Context) {
-    private val accountManager = AccountManager.get(context)
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
-    private val json = Json { ignoreUnknownKeys = true }
-    private val mediaType = "application/json".toMediaType()
 
-    private var cachedAccount: Account? = null
-    private var cachedToken: String? = null
+    private val http = OkHttpClient()
+    private val jsonMedia = "application/json; charset=utf-8".toMediaType()
 
-    suspend fun chooseAccount(activity: Activity): Account? = withContext(Dispatchers.Main) {
-        val intent = AccountManager.newChooseAccountIntent(
-            null,
-            null,
-            arrayOf("com.google"),
-            null,
-            null,
-            null,
-            null
-        )
-        // Caller launches this intent via ActivityResultLauncher
-        // and calls setAccount() with the result
-        null
-    }
+    @Suppress("DEPRECATION")
+    fun buildAccountPickerIntent(): Intent =
+        AccountManager.newChooseAccountIntent(null, null, arrayOf(ACCOUNT_TYPE), null, null, null, null)
 
-    fun setAccount(account: Account) {
-        cachedAccount = account
-        cachedToken = null
-    }
-
-    fun getSelectedAccount(): Account? = cachedAccount
-
-    suspend fun getAuthToken(activity: Activity): String {
-        val account = cachedAccount ?: throw IllegalStateException("No Google account selected")
-        return withContext(Dispatchers.IO) {
+    suspend fun getAuthTokenForAccount(accountName: String): AuthResult =
+        withContext(Dispatchers.IO) {
+            val account = Account(accountName, ACCOUNT_TYPE)
             suspendCancellableCoroutine { cont ->
-                accountManager.getAuthToken(
-                    account,
-                    "oauth2:https://www.googleapis.com/auth/tasks",
-                    Bundle(),
-                    activity,
-                    { future ->
-                        try {
-                            val result = future.result
-                            val token = result.getString(AccountManager.KEY_AUTHTOKEN)
-                            if (token != null) {
-                                cachedToken = token
-                                cont.resume(token)
-                            } else {
-                                cont.resumeWithException(Exception("No auth token returned"))
-                            }
-                        } catch (e: Exception) {
-                            cont.resumeWithException(e)
+                AccountManager.get(context).getAuthToken(account, SCOPE, null, null, { future ->
+                    runCatching {
+                        val bundle = future.result
+                        @Suppress("DEPRECATION")
+                        val authIntent = bundle.getParcelable<Intent>(AccountManager.KEY_INTENT)
+                        if (authIntent != null) cont.resume(AuthResult.ConsentRequired(authIntent))
+                        else {
+                            val token = bundle.getString(AccountManager.KEY_AUTHTOKEN)
+                            if (token != null) cont.resume(AuthResult.Token(token))
+                            else cont.resume(AuthResult.Failed("No token in bundle"))
                         }
-                    },
-                    null
-                )
+                    }.onFailure { e -> cont.resume(AuthResult.Failed(e.message ?: "Auth failed")) }
+                }, null)
             }
         }
+
+    fun invalidateToken(token: String) {
+        AccountManager.get(context).invalidateAuthToken(ACCOUNT_TYPE, token)
     }
 
-    suspend fun createTask(title: String, token: String): TaskCreateResult = withContext(Dispatchers.IO) {
-        val url = "https://www.googleapis.com/tasks/v1/lists/@default/tasks"
-        val body = json.encodeToString(
-            kotlinx.serialization.serializer<TaskCreateRequest>(),
-            TaskCreateRequest(title = title)
-        )
+    suspend fun createTask(token: String, title: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = buildJsonObject {
+                    put("title", title)
+                }.toString()
 
-        val request = Request.Builder()
+                post(token, TASKS_BASE, body) != null
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+    private fun post(token: String, url: String, body: String): String? = execute(
+        Request.Builder()
             .url(url)
-            .addHeader("Authorization", "Bearer $token")
-            .post(body.toRequestBody(mediaType))
+            .header("Authorization", "Bearer $token")
+            .post(body.toRequestBody(jsonMedia))
             .build()
+    )
 
-        val response = client.newCall(request).execute()
-        val responseBody = response.body?.string() ?: ""
+    class AuthExpiredException : Exception("Token expired")
 
-        if (response.code == 401) {
-            // Token expired — invalidate and throw so caller can retry
-            accountManager.invalidateAuthToken("com.google", token)
-            cachedToken = null
-            throw TokenExpiredException()
+    private fun execute(request: Request): String? {
+        return try {
+            http.newCall(request).execute().use { r ->
+                if (r.isSuccessful) return r.body?.string()
+
+                val body = r.body?.string()
+                Log.w(TAG, "API error ${r.code}: $body")
+
+                if (r.code == 401) {
+                    val oldToken = request.header("Authorization")?.removePrefix("Bearer ")
+                    val newToken = refreshToken(oldToken)
+                    if (newToken != null) {
+                        val retry = request.newBuilder()
+                            .header("Authorization", "Bearer $newToken")
+                            .build()
+                        return http.newCall(retry).execute().use { r2 ->
+                            if (r2.isSuccessful) r2.body?.string()
+                            else {
+                                Log.e(TAG, "Retry also failed: ${r2.code}")
+                                throw AuthExpiredException()
+                            }
+                        }
+                    }
+                    throw AuthExpiredException()
+                }
+                null
+            }
+        } catch (e: AuthExpiredException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Request failed", e)
+            null
         }
-
-        if (!response.isSuccessful) {
-            throw Exception("Google Tasks API error ${response.code}: $responseBody")
-        }
-
-        json.decodeFromString<TaskCreateResult>(responseBody)
     }
 
-    suspend fun sendToDadDo(title: String, activity: Activity): TaskCreateResult {
-        var token = cachedToken ?: getAuthToken(activity)
+    private fun refreshToken(oldToken: String?): String? {
+        val prefs = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        val accountName = prefs.getString(Prefs.KEY_ACCOUNT, null) ?: return null
+        val am = AccountManager.get(context)
+
+        if (oldToken != null) am.invalidateAuthToken(ACCOUNT_TYPE, oldToken)
+
         return try {
-            createTask(title, token)
-        } catch (e: TokenExpiredException) {
-            token = getAuthToken(activity)
-            createTask(title, token)
+            val account = Account(accountName, ACCOUNT_TYPE)
+            val bundle = am.getAuthToken(account, SCOPE, null, false, null, null).result
+            val newToken = bundle?.getString(AccountManager.KEY_AUTHTOKEN)
+            if (newToken != null) {
+                prefs.edit().putString(Prefs.KEY_TOKEN, newToken).apply()
+                Log.d(TAG, "Token refreshed silently")
+            }
+            newToken
+        } catch (e: Exception) {
+            Log.e(TAG, "Silent token refresh failed", e)
+            null
         }
+    }
+
+    companion object {
+        private const val TAG = "TasksApiClient"
+        private const val ACCOUNT_TYPE = "com.google"
+        private const val SCOPE = "oauth2:https://www.googleapis.com/auth/tasks"
+        private const val TASKS_BASE = "https://www.googleapis.com/tasks/v1/lists/@default/tasks"
     }
 }
 
-class TokenExpiredException : Exception("Google Tasks auth token expired")
+sealed class AuthResult {
+    data class Token(val token: String) : AuthResult()
+    data class ConsentRequired(val intent: Intent) : AuthResult()
+    data class Failed(val message: String) : AuthResult()
+}
