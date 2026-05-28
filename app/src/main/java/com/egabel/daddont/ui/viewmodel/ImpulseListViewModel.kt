@@ -1,10 +1,14 @@
 package com.egabel.daddont.ui.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.egabel.daddont.DadDontApp
+import com.egabel.daddont.api.gemini.GeminiClient
+import com.egabel.daddont.data.model.Category
 import com.egabel.daddont.data.model.DismissalType
+import com.egabel.daddont.data.model.Tier
 import com.egabel.daddont.data.repository.ImpulseRepository
 import com.egabel.daddont.data.repository.ImpulseWithState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +30,7 @@ data class ImpulseListUiState(
 
 class ImpulseListViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ImpulseRepository((application as DadDontApp).database)
+    private val gemini = GeminiClient(application)
 
     private val _filter = MutableStateFlow(ListFilter.ACTIVE)
     private val _captureText = MutableStateFlow("")
@@ -73,16 +78,37 @@ class ImpulseListViewModel(application: Application) : AndroidViewModel(applicat
     fun captureImpulse() {
         val text = _captureText.value.trim()
         if (text.isEmpty()) return
+        _captureText.value = ""
         viewModelScope.launch {
-            repository.capture(text)
-            _captureText.value = ""
+            val impulse = repository.capture(text)
+            classifyNow(impulse.id, text)
         }
     }
 
     fun captureVoiceResult(text: String) {
         if (text.isBlank()) return
         viewModelScope.launch {
-            repository.capture(text.trim())
+            val impulse = repository.capture(text.trim())
+            classifyNow(impulse.id, text.trim())
+        }
+    }
+
+    private suspend fun classifyNow(impulseId: UUID, content: String) {
+        try {
+            val classification = gemini.classify(content) ?: return
+            val impulse = repository.getById(impulseId)?.impulse ?: return
+            repository.updateClassification(
+                impulse.copy(
+                    tier = Tier.valueOf(classification.tier),
+                    category = Category.valueOf(classification.category),
+                    classifiedAt = System.currentTimeMillis(),
+                    partnerGate = classification.partnerGate,
+                    partnerReason = classification.partnerReason.ifEmpty { null },
+                    ungraded = false
+                )
+            )
+        } catch (e: Exception) {
+            Log.e("ImpulseListVM", "Immediate classification failed, WorkManager will retry", e)
         }
     }
 
