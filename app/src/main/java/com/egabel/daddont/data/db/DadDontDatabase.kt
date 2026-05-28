@@ -1,0 +1,37 @@
+package com.egabel.daddont.data.db
+
+import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+import com.egabel.daddont.data.model.DialogSession
+import com.egabel.daddont.data.model.Impulse
+import com.egabel.daddont.data.model.ReturnEvent
+
+@Database(
+    entities = [Impulse::class, ReturnEvent::class, DialogSession::class],
+    version = 1,
+    exportSchema = false
+)
+@TypeConverters(Converters::class)
+abstract class DadDontDatabase : RoomDatabase() {
+    abstract fun impulseDao(): ImpulseDao
+    abstract fun returnEventDao(): ReturnEventDao
+    abstract fun dialogSessionDao(): DialogSessionDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: DadDontDatabase? = null
+
+        fun getInstance(context: Context): DadDontDatabase {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: Room.databaseBuilder(
+                    context.applicationContext,
+                    DadDontDatabase::class.java,
+                    "daddont.db"
+                ).build().also { INSTANCE = it }
+            }
+        }
+    }
+}

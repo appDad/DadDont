@@ -1,0 +1,441 @@
+package com.egabel.daddont.ui.screen
+
+import android.app.Activity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Badge
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.egabel.daddont.data.model.DismissalType
+import com.egabel.daddont.data.model.ImpulseState
+import com.egabel.daddont.ui.theme.ImpulseColors
+import com.egabel.daddont.ui.theme.RamonaBadge
+import com.egabel.daddont.ui.viewmodel.DialogMessage
+import com.egabel.daddont.ui.viewmodel.ImpulseDetailViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun ImpulseDetailScreen(
+    onBack: () -> Unit,
+    viewModel: ImpulseDetailViewModel = viewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    var showReturnDialog by remember { mutableStateOf(false) }
+    var returnRationale by remember { mutableStateOf("") }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Impulse") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
+        val impulseWithState = uiState.impulseWithState
+        if (impulseWithState == null) {
+            return@Scaffold
+        }
+
+        val impulse = impulseWithState.impulse
+        val state = impulseWithState.state
+        val borderColor = ImpulseColors.borderColor(state)
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header card
+            item {
+                Card(
+                    border = BorderStroke(2.dp, borderColor),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = ImpulseColors.label(state),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = borderColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (impulse.ramonaGate) {
+                                Badge(containerColor = RamonaBadge) {
+                                    Text("Ramona", color = Color.White)
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = impulse.content,
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Text(
+                                text = impulse.tier?.name ?: "Ungraded",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = impulse.category?.name ?: "",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+                                    .format(Date(impulse.createdAt)),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (impulse.ramonaGate && impulse.ramonaReason != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = impulse.ramonaReason,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontStyle = FontStyle.Italic,
+                                color = RamonaBadge
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Returned ${impulse.returnCount}x · Reactivated ${impulse.reactivationCount}x",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // Actions
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // "Impulse returned" button — available on red/yellow/green
+                    if (state != ImpulseState.GRAY) {
+                        if (!showReturnDialog) {
+                            OutlinedButton(
+                                onClick = { showReturnDialog = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Impulse returned")
+                            }
+                        } else {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    OutlinedTextField(
+                                        value = returnRationale,
+                                        onValueChange = { returnRationale = it },
+                                        label = { Text("Why still want this? (optional)") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(onClick = {
+                                            viewModel.recordReturn(returnRationale.ifBlank { null })
+                                            returnRationale = ""
+                                            showReturnDialog = false
+                                        }) { Text("Record") }
+                                        TextButton(onClick = {
+                                            returnRationale = ""
+                                            showReturnDialog = false
+                                        }) { Text("Cancel") }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Reactivate from gray
+                    if (state == ImpulseState.GRAY && impulse.dismissedAt != null) {
+                        OutlinedButton(
+                            onClick = { viewModel.recordReturn() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Reactivate")
+                        }
+                    }
+
+                    // Green actions: execute, dismiss, move to DadDo
+                    if (state == ImpulseState.GREEN) {
+                        HorizontalDivider()
+                        Text(
+                            text = "Cooled — your call",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        if (impulse.ramonaGate) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                AssistChip(
+                                    onClick = { viewModel.dismiss(DismissalType.RAMONA_APPROVED) },
+                                    label = { Text("Ramona approved") }
+                                )
+                                AssistChip(
+                                    onClick = { viewModel.dismiss(DismissalType.RAMONA_DECLINED) },
+                                    label = { Text("Ramona declined") }
+                                )
+                                AssistChip(
+                                    onClick = { viewModel.dismiss(DismissalType.DECIDED_NOT_TO_ASK) },
+                                    label = { Text("Decided not to ask") }
+                                )
+                            }
+                        } else {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                AssistChip(
+                                    onClick = { viewModel.dismiss(DismissalType.DONE) },
+                                    label = { Text("Done / Executed") }
+                                )
+                                AssistChip(
+                                    onClick = { viewModel.dismiss(DismissalType.NO_LONGER_WANT) },
+                                    label = { Text("No longer want") }
+                                )
+                            }
+                        }
+
+                        if (!uiState.sentToDadDo) {
+                            Button(
+                                onClick = { viewModel.sendToDadDo(context as Activity) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary
+                                )
+                            ) {
+                                Text("Move to DadDo")
+                            }
+                        } else {
+                            Text(
+                                text = "Sent to DadDo",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontStyle = FontStyle.Italic
+                            )
+                        }
+                    }
+
+                    // Manual Ramona flag toggle
+                    TextButton(onClick = { viewModel.toggleRamonaFlag() }) {
+                        Text(if (impulse.ramonaGate) "Remove Ramona flag" else "Flag for Ramona")
+                    }
+                }
+            }
+
+            // Talk Me Down section
+            item {
+                HorizontalDivider()
+                val shouldSuggest = impulse.returnCount >= 3 && !uiState.showTalkMeDown
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { viewModel.toggleTalkMeDown() }) {
+                            Icon(Icons.Default.Chat, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Talk me through this")
+                        }
+                    }
+                    if (shouldSuggest) {
+                        Text(
+                            text = "You've returned to this ${impulse.returnCount} times. Want to talk it through?",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 12.dp)
+                        )
+                    }
+                }
+            }
+
+            // Dialog conversation
+            if (uiState.showTalkMeDown) {
+                items(uiState.dialogMessages) { message ->
+                    DialogBubble(message)
+                }
+
+                if (uiState.isDialogLoading) {
+                    item {
+                        CircularProgressIndicator(
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = uiState.dialogInput,
+                            onValueChange = viewModel::setDialogInput,
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("What are you thinking?") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = viewModel::sendDialogMessage,
+                            enabled = uiState.dialogInput.isNotBlank() && !uiState.isDialogLoading
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                        }
+                    }
+                }
+            }
+
+            // Return history
+            if (uiState.returnEvents.isNotEmpty()) {
+                item {
+                    HorizontalDivider()
+                    Text(
+                        text = "Return History",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+                items(uiState.returnEvents) { event ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+                                .format(Date(event.timestamp)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (event.rationale != null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = event.rationale,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontStyle = FontStyle.Italic
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DialogBubble(message: DialogMessage) {
+    val isUser = message.role == "user"
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isUser)
+                    MaterialTheme.colorScheme.primaryContainer
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Text(
+                text = message.content,
+                modifier = Modifier.padding(12.dp),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
