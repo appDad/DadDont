@@ -24,9 +24,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -42,12 +48,16 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -55,7 +65,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -69,13 +78,14 @@ import com.egabel.daddont.ui.theme.BlueLeft
 import com.egabel.daddont.ui.theme.BorderColor
 import com.egabel.daddont.ui.theme.ImpulseColors
 import com.egabel.daddont.ui.theme.PartnerBadge
-import com.egabel.daddont.ui.theme.PurpleRight
+import com.egabel.daddont.ui.theme.RedState
 import com.egabel.daddont.ui.theme.TextDim
 import com.egabel.daddont.ui.theme.TextMid
 import com.egabel.daddont.ui.theme.TitleGradient
 import com.egabel.daddont.ui.viewmodel.DialogMessage
 import com.egabel.daddont.ui.viewmodel.ImpulseDetailViewModel
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -90,11 +100,113 @@ fun ImpulseDetailScreen(
     var showReturnDialog by remember { mutableStateOf(false) }
     var returnRationale by remember { mutableStateOf("") }
 
+    // Edit state
+    var isEditing by remember { mutableStateOf(false) }
+    var editText by remember { mutableStateOf("") }
+
+    // Delete confirmation
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    // Cool-until picker flow: date → time
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var pickedDateMs by remember { mutableStateOf(0L) }
+
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearError()
         }
+    }
+
+    // ── Delete confirmation dialog ───────────────────────────────────
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete impulse?", fontWeight = FontWeight.SemiBold) },
+            text = { Text("This can't be undone.", color = TextMid) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    viewModel.delete { onBack() }
+                }) {
+                    Text("Delete", color = RedState)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            shape = RoundedCornerShape(14.dp)
+        )
+    }
+
+    // ── Date picker dialog ───────────────────────────────────────────
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = System.currentTimeMillis() + 86_400_000L
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { ms ->
+                        pickedDateMs = ms
+                        showDatePicker = false
+                        showTimePicker = true
+                    }
+                }) {
+                    Text("Next", color = BlueLeft)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // ── Time picker dialog ───────────────────────────────────────────
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(initialHour = 20, initialMinute = 0)
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("Pick a time", fontWeight = FontWeight.SemiBold) },
+            text = { TimePicker(state = timePickerState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    // DatePicker returns UTC midnight — extract y/m/d in UTC,
+                    // then build the target in the device's local timezone.
+                    val utcCal = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+                        timeInMillis = pickedDateMs
+                    }
+                    val cal = Calendar.getInstance().apply {
+                        set(Calendar.YEAR, utcCal.get(Calendar.YEAR))
+                        set(Calendar.MONTH, utcCal.get(Calendar.MONTH))
+                        set(Calendar.DAY_OF_MONTH, utcCal.get(Calendar.DAY_OF_MONTH))
+                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                        set(Calendar.MINUTE, timePickerState.minute)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
+                    viewModel.setCustomCoolUntil(cal.timeInMillis)
+                    showTimePicker = false
+                }) {
+                    Text("Set", color = BlueLeft)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            shape = RoundedCornerShape(14.dp)
+        )
     }
 
     Scaffold(
@@ -118,6 +230,18 @@ fun ImpulseDetailScreen(
                             contentDescription = "Back",
                             tint = TextDim
                         )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        val content = uiState.impulseWithState?.impulse?.content ?: ""
+                        editText = content
+                        isEditing = true
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextDim)
+                    }
+                    IconButton(onClick = { showDeleteConfirm = true }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = TextDim)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -212,13 +336,46 @@ fun ImpulseDetailScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Impulse content
-                            Text(
-                                text = impulse.content,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            // Impulse content — inline edit or display
+                            if (isEditing) {
+                                OutlinedTextField(
+                                    value = editText,
+                                    onValueChange = { editText = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = BlueLeft,
+                                        unfocusedBorderColor = BorderColor,
+                                        focusedContainerColor = Color.White,
+                                        unfocusedContainerColor = Color.White
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            if (editText.isNotBlank()) {
+                                                viewModel.updateContent(editText.trim())
+                                            }
+                                            isEditing = false
+                                        },
+                                        shape = RoundedCornerShape(14.dp),
+                                        border = BorderStroke(1.dp, BlueLeft)
+                                    ) {
+                                        Text("Save", color = BlueLeft, fontSize = 13.sp)
+                                    }
+                                    TextButton(onClick = { isEditing = false }) {
+                                        Text("Cancel", color = TextDim, fontSize = 13.sp)
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    text = impulse.content,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
 
                             Spacer(modifier = Modifier.height(12.dp))
 
@@ -240,6 +397,25 @@ fun ImpulseDetailScreen(
                                     fontSize = 11.sp,
                                     color = TextDim
                                 )
+                            }
+
+                            // Custom cool-until indicator
+                            impulse.customCoolUntil?.let { coolUntil ->
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(13.dp),
+                                        tint = BlueLeft
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Cools at ${SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(coolUntil))}",
+                                        fontSize = 11.sp,
+                                        color = BlueLeft
+                                    )
+                                }
                             }
 
                             if (impulse.partnerGate && impulse.partnerReason != null) {
@@ -273,6 +449,40 @@ fun ImpulseDetailScreen(
                     border = BorderStroke(1.dp, BorderColor)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
+                        // Cool-until button (only for active, non-gray impulses)
+                        if (state != ImpulseState.GRAY && state != ImpulseState.PENDING) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { showDatePicker = true },
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, BlueLeft),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        tint = BlueLeft,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Cool until…", color = BlueLeft, fontSize = 13.sp)
+                                }
+                                if (impulse.customCoolUntil != null) {
+                                    OutlinedButton(
+                                        onClick = { viewModel.setCustomCoolUntil(null) },
+                                        shape = RoundedCornerShape(14.dp),
+                                        border = BorderStroke(1.dp, BorderColor)
+                                    ) {
+                                        Text("Reset", color = TextDim, fontSize = 13.sp)
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+
                         if (state != ImpulseState.GRAY) {
                             if (!showReturnDialog) {
                                 OutlinedButton(
@@ -395,25 +605,6 @@ fun ImpulseDetailScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            if (!uiState.sentToDadDo) {
-                                OutlinedButton(
-                                    onClick = { viewModel.sendToDadDo() },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(14.dp),
-                                    border = BorderStroke(1.dp, PurpleRight)
-                                ) {
-                                    Text("Move to DadDo", color = PurpleRight, fontSize = 14.sp)
-                                }
-                            } else {
-                                Text(
-                                    text = "Sent to DadDo ✓",
-                                    fontSize = 12.sp,
-                                    color = TextDim,
-                                    fontStyle = FontStyle.Italic
-                                )
-                            }
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -611,9 +802,11 @@ private fun DismissChip(label: String, onClick: () -> Unit) {
 }
 
 private fun formatCountdown(ms: Long): String {
-    val totalMin = ms / 60_000
+    val totalSec = ms / 1_000
+    val totalMin = totalSec / 60
     return when {
-        totalMin < 60 -> "${totalMin}m left"
+        totalMin < 1 -> "${totalSec}s left"
+        totalMin < 60 -> "${totalMin}m ${totalSec % 60}s left"
         totalMin < 1440 -> "${totalMin / 60}h ${totalMin % 60}m left"
         else -> "${totalMin / 1440}d ${(totalMin % 1440) / 60}h left"
     }

@@ -12,7 +12,6 @@ import kotlinx.coroutines.launch
 
 data class StatsUiState(
     val killedThisMonth: Int = 0,
-    val executedThisMonth: Int = 0,
     val stillCycling: Int = 0,
     val topOffenders: List<Impulse> = emptyList(),
     val isLoading: Boolean = true
@@ -36,7 +35,6 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
 
             _uiState.value = StatsUiState(
                 killedThisMonth = repository.countDismissedSince(thirtyDaysAgo),
-                executedThisMonth = repository.countExecutedSince(thirtyDaysAgo),
                 stillCycling = repository.countActive(),
                 topOffenders = repository.topRecurrenceOffenders(),
                 isLoading = false

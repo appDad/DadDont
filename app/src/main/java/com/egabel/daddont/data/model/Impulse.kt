@@ -17,7 +17,7 @@ data class Impulse(
     val ungraded: Boolean = true,
     val returnCount: Int = 0,
     val reactivationCount: Int = 0,
-    val sentToDadDoAt: Long? = null,
     val dismissedAt: Long? = null,
-    val dismissalType: DismissalType? = null
+    val dismissalType: DismissalType? = null,
+    val customCoolUntil: Long? = null
 )

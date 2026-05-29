@@ -103,7 +103,7 @@ private fun FirstLaunchScreen(onApiKeySaved: (String) -> Unit) {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "You can link Google Tasks later in Settings",
+            text = "You can change this later in Settings",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

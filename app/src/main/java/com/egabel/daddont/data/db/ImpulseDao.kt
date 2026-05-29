@@ -1,6 +1,7 @@
 package com.egabel.daddont.data.db
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
@@ -15,6 +16,9 @@ interface ImpulseDao {
 
     @Update
     suspend fun update(impulse: Impulse)
+
+    @Delete
+    suspend fun delete(impulse: Impulse)
 
     @Query("SELECT * FROM impulses WHERE dismissedAt IS NULL ORDER BY createdAt DESC")
     fun observeActive(): Flow<List<Impulse>>
@@ -39,9 +43,6 @@ interface ImpulseDao {
 
     @Query("SELECT COUNT(*) FROM impulses WHERE dismissedAt IS NOT NULL AND dismissedAt > :since")
     suspend fun countDismissedSince(since: Long): Int
-
-    @Query("SELECT COUNT(*) FROM impulses WHERE sentToDadDoAt IS NOT NULL AND sentToDadDoAt > :since")
-    suspend fun countExecutedSince(since: Long): Int
 
     @Query("SELECT COUNT(*) FROM impulses WHERE dismissedAt IS NULL")
     suspend fun countActive(): Int

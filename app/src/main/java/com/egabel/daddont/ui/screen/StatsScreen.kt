@@ -118,13 +118,6 @@ fun StatsScreen(
             }
             item {
                 StatCard(
-                    value = "${uiState.executedThisMonth}",
-                    label = "impulses you waited out and then executed",
-                    accentColor = BlueLeft
-                )
-            }
-            item {
-                StatCard(
                     value = "${uiState.stillCycling}",
                     label = "impulses still cycling",
                     accentColor = YellowState

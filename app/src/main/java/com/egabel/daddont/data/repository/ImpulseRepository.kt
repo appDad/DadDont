@@ -30,9 +30,19 @@ class ImpulseRepository(private val db: DadDontDatabase) {
 
     fun observeActiveWithState(): Flow<List<ImpulseWithState>> =
         impulseDao.observeActive().map { impulses ->
-            impulses.map {
-                ImpulseWithState(it, ImpulseStateCalculator.computeState(it),
-                    ImpulseStateCalculator.msUntilNextState(it))
+            impulses.mapNotNull { impulse ->
+                val state = ImpulseStateCalculator.computeState(impulse)
+                // Auto-archive impulses whose cooling has fully elapsed
+                if (state == ImpulseState.GRAY && impulse.dismissedAt == null) {
+                    impulseDao.update(impulse.copy(
+                        dismissedAt = System.currentTimeMillis(),
+                        dismissalType = DismissalType.NO_LONGER_WANT
+                    ))
+                    null // remove from this active list
+                } else {
+                    ImpulseWithState(impulse, state,
+                        ImpulseStateCalculator.msUntilNextState(impulse))
+                }
             }
         }
 
@@ -91,14 +101,24 @@ class ImpulseRepository(private val db: DadDontDatabase) {
         ))
     }
 
-    suspend fun markSentToDadDo(impulseId: UUID) {
-        val impulse = impulseDao.getById(impulseId) ?: return
-        impulseDao.update(impulse.copy(sentToDadDoAt = System.currentTimeMillis()))
-    }
-
     suspend fun togglePartnerFlag(impulseId: UUID) {
         val impulse = impulseDao.getById(impulseId) ?: return
         impulseDao.update(impulse.copy(partnerGate = !impulse.partnerGate))
+    }
+
+    suspend fun updateContent(impulseId: UUID, newContent: String) {
+        val impulse = impulseDao.getById(impulseId) ?: return
+        impulseDao.update(impulse.copy(content = newContent))
+    }
+
+    suspend fun setCustomCoolUntil(impulseId: UUID, coolUntilMs: Long?) {
+        val impulse = impulseDao.getById(impulseId) ?: return
+        impulseDao.update(impulse.copy(customCoolUntil = coolUntilMs))
+    }
+
+    suspend fun delete(impulseId: UUID) {
+        val impulse = impulseDao.getById(impulseId) ?: return
+        impulseDao.delete(impulse)
     }
 
     suspend fun getUngraded(): List<Impulse> = impulseDao.getUngraded()
@@ -125,7 +145,6 @@ class ImpulseRepository(private val db: DadDontDatabase) {
 
     // Stats
     suspend fun countDismissedSince(since: Long): Int = impulseDao.countDismissedSince(since)
-    suspend fun countExecutedSince(since: Long): Int = impulseDao.countExecutedSince(since)
     suspend fun countActive(): Int = impulseDao.countActive()
     suspend fun topRecurrenceOffenders(limit: Int = 10): List<Impulse> =
         impulseDao.topRecurrenceOffenders(limit)

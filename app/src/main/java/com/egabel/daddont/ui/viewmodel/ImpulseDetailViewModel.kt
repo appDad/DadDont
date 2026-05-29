@@ -1,16 +1,12 @@
 package com.egabel.daddont.ui.viewmodel
 
 import android.app.Application
-import android.content.Context
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.egabel.daddont.DadDontApp
-import com.egabel.daddont.Prefs
 import com.egabel.daddont.api.gemini.TalkMeDownClient
-import com.egabel.daddont.api.tasks.AuthResult
-import com.egabel.daddont.api.tasks.GoogleTasksClient
 import com.egabel.daddont.data.model.Category
 import com.egabel.daddont.data.model.DismissalType
 import com.egabel.daddont.data.model.ReturnEvent
@@ -39,7 +35,6 @@ data class ImpulseDetailUiState(
     val isDialogLoading: Boolean = false,
     val dialogInput: String = "",
     val showTalkMeDown: Boolean = false,
-    val sentToDadDo: Boolean = false,
     val error: String? = null
 )
 
@@ -49,7 +44,6 @@ class ImpulseDetailViewModel(
 ) : AndroidViewModel(application) {
     private val repository = ImpulseRepository((application as DadDontApp).database)
     private val talkMeDownClient = TalkMeDownClient(application)
-    val tasksClient = GoogleTasksClient(application)
 
     private val impulseId: UUID = UUID.fromString(savedStateHandle.get<String>("impulseId")!!)
 
@@ -76,7 +70,6 @@ class ImpulseDetailViewModel(
             isDialogLoading = values[3] as Boolean,
             dialogInput = values[4] as String,
             showTalkMeDown = values[5] as Boolean,
-            sentToDadDo = (values[0] as ImpulseWithState?)?.impulse?.sentToDadDoAt != null,
             error = values[6] as String?
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ImpulseDetailUiState())
@@ -103,41 +96,22 @@ class ImpulseDetailViewModel(
         }
     }
 
-    fun sendToDadDo() {
+    fun updateContent(newContent: String) {
         viewModelScope.launch {
-            try {
-                val impulse = repository.getById(impulseId)?.impulse ?: return@launch
-                val prefs = getApplication<Application>()
-                    .getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
-                val accountName = prefs.getString(Prefs.KEY_ACCOUNT, null)
-                if (accountName == null) {
-                    _error.value = "No Google account linked — set one up in settings"
-                    return@launch
-                }
+            repository.updateContent(impulseId, newContent)
+        }
+    }
 
-                val token = when (val auth = tasksClient.getAuthTokenForAccount(accountName)) {
-                    is AuthResult.Token -> auth.token
-                    is AuthResult.ConsentRequired -> {
-                        _error.value = "Google Tasks consent needed — re-open the app"
-                        return@launch
-                    }
-                    is AuthResult.Failed -> {
-                        _error.value = "Auth failed: ${auth.message}"
-                        return@launch
-                    }
-                }
+    fun setCustomCoolUntil(coolUntilMs: Long?) {
+        viewModelScope.launch {
+            repository.setCustomCoolUntil(impulseId, coolUntilMs)
+        }
+    }
 
-                val success = tasksClient.createTask(token, impulse.content)
-                if (success) {
-                    repository.markSentToDadDo(impulseId)
-                } else {
-                    _error.value = "Failed to create task in DadDo"
-                }
-            } catch (e: GoogleTasksClient.AuthExpiredException) {
-                _error.value = "Google Tasks token expired — try again"
-            } catch (e: Exception) {
-                _error.value = "Failed to send to DadDo: ${e.message}"
-            }
+    fun delete(onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            repository.delete(impulseId)
+            onDeleted()
         }
     }
 

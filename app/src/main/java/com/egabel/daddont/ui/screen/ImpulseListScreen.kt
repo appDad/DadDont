@@ -387,9 +387,11 @@ private fun formatRelativeTime(timestamp: Long): String {
 }
 
 private fun formatCountdown(ms: Long): String {
-    val totalMin = ms / 60_000
+    val totalSec = ms / 1_000
+    val totalMin = totalSec / 60
     return when {
-        totalMin < 60 -> "${totalMin}m left"
+        totalMin < 1 -> "${totalSec}s left"
+        totalMin < 60 -> "${totalMin}m ${totalSec % 60}s left"
         totalMin < 1440 -> "${totalMin / 60}h ${totalMin % 60}m left"
         else -> "${totalMin / 1440}d ${(totalMin % 1440) / 60}h left"
     }
