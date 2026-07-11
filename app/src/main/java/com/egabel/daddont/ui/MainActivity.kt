@@ -1,10 +1,14 @@
 package com.egabel.daddont.ui
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -28,19 +33,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.egabel.daddont.R
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import com.egabel.daddont.Prefs
+import com.egabel.daddont.R
+import com.egabel.daddont.notifications.NotificationHelper
 import com.egabel.daddont.ui.navigation.DadDontNavGraph
+import com.egabel.daddont.ui.navigation.Routes
 import com.egabel.daddont.ui.theme.DadDontTheme
+import com.egabel.daddont.widget.WidgetUpdater
 import com.egabel.daddont.worker.ClassificationWorker
+import com.egabel.daddont.worker.DigestWorker
 
 class MainActivity : ComponentActivity() {
+
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        NotificationHelper.createChannels(this)
         ClassificationWorker.enqueue(applicationContext)
+        DigestWorker.enqueue(applicationContext)
+        WidgetUpdater.updateAll(applicationContext)
+        requestNotificationPermissionIfNeeded()
+
+        // Deep link from a "verdict time" notification
+        val deepLinkImpulseId = intent?.getStringExtra(NotificationHelper.EXTRA_IMPULSE_ID)
 
         setContent {
             DadDontTheme {
@@ -58,9 +79,25 @@ class MainActivity : ComponentActivity() {
                     } else {
                         val navController = rememberNavController()
                         DadDontNavGraph(navController = navController)
+
+                        LaunchedEffect(deepLinkImpulseId) {
+                            deepLinkImpulseId?.let {
+                                navController.navigate(Routes.impulseDetail(it))
+                            }
+                        }
                     }
                 }
             }
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }
@@ -88,7 +125,7 @@ private fun FirstLaunchScreen(onApiKeySaved: (String) -> Unit) {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Capture impulses. Let time do the work.",
+            text = "Capture the want. Cool it down. Face the verdict.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

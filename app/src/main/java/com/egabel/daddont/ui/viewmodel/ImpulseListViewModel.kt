@@ -7,10 +7,13 @@ import androidx.lifecycle.viewModelScope
 import com.egabel.daddont.DadDontApp
 import com.egabel.daddont.api.gemini.GeminiClient
 import com.egabel.daddont.data.model.Category
-import com.egabel.daddont.data.model.DismissalType
+import com.egabel.daddont.data.model.ImpulseState
+import com.egabel.daddont.data.model.Prediction
 import com.egabel.daddont.data.model.Tier
 import com.egabel.daddont.data.repository.ImpulseRepository
 import com.egabel.daddont.data.repository.ImpulseWithState
+import com.egabel.daddont.widget.WidgetUpdater
+import com.egabel.daddont.worker.VerdictWorker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,10 +25,14 @@ import java.util.UUID
 enum class ListFilter { ACTIVE, ARCHIVE, PARTNER }
 
 data class ImpulseListUiState(
-    val impulses: List<ImpulseWithState> = emptyList(),
+    val decide: List<ImpulseWithState> = emptyList(),   // GREEN — verdicts due, pinned on top
+    val cooling: List<ImpulseWithState> = emptyList(),  // PENDING/RED/YELLOW
+    val impulses: List<ImpulseWithState> = emptyList(), // archive / partner tabs
     val filter: ListFilter = ListFilter.ACTIVE,
     val captureText: String = "",
-    val isCapturing: Boolean = false
+    // Quick-facts sheet shown right after a capture
+    val pendingFactsFor: UUID? = null,
+    val pendingFactsContent: String = ""
 )
 
 class ImpulseListViewModel(application: Application) : AndroidViewModel(application) {
@@ -34,7 +41,7 @@ class ImpulseListViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _filter = MutableStateFlow(ListFilter.ACTIVE)
     private val _captureText = MutableStateFlow("")
-    private val _isCapturing = MutableStateFlow(false)
+    private val _pendingFacts = MutableStateFlow<Pair<UUID, String>?>(null)
 
     private val activeImpulses = repository.observeActiveWithState()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -44,23 +51,42 @@ class ImpulseListViewModel(application: Application) : AndroidViewModel(applicat
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val uiState: StateFlow<ImpulseListUiState> = combine(
-        _filter, _captureText, _isCapturing, activeImpulses, archivedImpulses, partnerImpulses
+        _filter, _captureText, _pendingFacts, activeImpulses, archivedImpulses, partnerImpulses
     ) { values ->
         val filter = values[0] as ListFilter
         val captureText = values[1] as String
-        val isCapturing = values[2] as Boolean
         @Suppress("UNCHECKED_CAST")
-        val impulses = when (filter) {
-            ListFilter.ACTIVE -> values[3] as List<ImpulseWithState>
-            ListFilter.ARCHIVE -> values[4] as List<ImpulseWithState>
-            ListFilter.PARTNER -> values[5] as List<ImpulseWithState>
+        val pendingFacts = values[2] as Pair<UUID, String>?
+        @Suppress("UNCHECKED_CAST")
+        val active = values[3] as List<ImpulseWithState>
+        @Suppress("UNCHECKED_CAST")
+        val archived = values[4] as List<ImpulseWithState>
+        @Suppress("UNCHECKED_CAST")
+        val partner = values[5] as List<ImpulseWithState>
+
+        when (filter) {
+            ListFilter.ACTIVE -> {
+                val (decide, cooling) = active.partition { it.state == ImpulseState.GREEN }
+                ImpulseListUiState(
+                    decide = decide.sortedByDescending { it.overdueMs ?: 0 },
+                    cooling = cooling,
+                    filter = filter,
+                    captureText = captureText,
+                    pendingFactsFor = pendingFacts?.first,
+                    pendingFactsContent = pendingFacts?.second ?: ""
+                )
+            }
+            ListFilter.ARCHIVE -> ImpulseListUiState(
+                impulses = archived, filter = filter, captureText = captureText,
+                pendingFactsFor = pendingFacts?.first,
+                pendingFactsContent = pendingFacts?.second ?: ""
+            )
+            ListFilter.PARTNER -> ImpulseListUiState(
+                impulses = partner, filter = filter, captureText = captureText,
+                pendingFactsFor = pendingFacts?.first,
+                pendingFactsContent = pendingFacts?.second ?: ""
+            )
         }
-        ImpulseListUiState(
-            impulses = impulses,
-            filter = filter,
-            captureText = captureText,
-            isCapturing = isCapturing
-        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ImpulseListUiState())
 
     fun setFilter(filter: ListFilter) {
@@ -71,62 +97,62 @@ class ImpulseListViewModel(application: Application) : AndroidViewModel(applicat
         _captureText.value = text
     }
 
-    fun setCapturing(capturing: Boolean) {
-        _isCapturing.value = capturing
-    }
-
     fun captureImpulse() {
         val text = _captureText.value.trim()
         if (text.isEmpty()) return
         _captureText.value = ""
-        viewModelScope.launch {
-            val impulse = repository.capture(text)
-            classifyNow(impulse.id, text)
-        }
+        capture(text)
     }
 
     fun captureVoiceResult(text: String) {
         if (text.isBlank()) return
+        capture(text.trim())
+    }
+
+    private fun capture(text: String) {
         viewModelScope.launch {
-            val impulse = repository.capture(text.trim())
-            classifyNow(impulse.id, text.trim())
+            val impulse = repository.capture(text)
+            // Show the quick-facts sheet immediately; classify in parallel
+            _pendingFacts.value = impulse.id to text
+            WidgetUpdater.updateAll(getApplication())
+            classifyNow(impulse.id, text)
         }
+    }
+
+    /** Quick-facts sheet result: desire slider, cost, prediction. */
+    fun saveFacts(impulseId: UUID, desire: Int, cost: Double?, prediction: Prediction?) {
+        _pendingFacts.value = null
+        viewModelScope.launch {
+            repository.updateFacets(impulseId, desire, cost, prediction)
+        }
+    }
+
+    fun skipFacts() {
+        _pendingFacts.value = null
     }
 
     private suspend fun classifyNow(impulseId: UUID, content: String) {
         try {
-            val classification = gemini.classify(content) ?: return
+            val c = gemini.classify(content) ?: return
             val impulse = repository.getById(impulseId)?.impulse ?: return
-            repository.updateClassification(
+            val classified = repository.applyClassification(
                 impulse.copy(
-                    tier = Tier.valueOf(classification.tier),
-                    category = Category.valueOf(classification.category),
-                    classifiedAt = System.currentTimeMillis(),
-                    partnerGate = classification.partnerGate,
-                    partnerReason = classification.partnerReason.ifEmpty { null },
-                    ungraded = false
+                    tier = Tier.valueOf(c.tier),
+                    category = Category.valueOf(c.category),
+                    partnerGate = c.partnerGate,
+                    partnerReason = c.partnerReason.ifEmpty { null },
+                    trigger = c.trigger ?: impulse.trigger,
+                    rationale = c.rationale ?: impulse.rationale,
+                    estimatedCost = impulse.estimatedCost ?: c.estimatedCostUsd,
+                    desireAtCapture = impulse.desireAtCapture ?: c.desireStrength
                 )
             )
+            classified.decideBy?.let {
+                VerdictWorker.schedule(getApplication(), classified.id, it)
+            }
+            WidgetUpdater.updateAll(getApplication())
         } catch (e: Exception) {
             Log.e("ImpulseListVM", "Immediate classification failed, WorkManager will retry", e)
-        }
-    }
-
-    fun recordReturn(impulseId: UUID, rationale: String? = null) {
-        viewModelScope.launch {
-            repository.recordReturn(impulseId, rationale)
-        }
-    }
-
-    fun dismiss(impulseId: UUID, type: DismissalType) {
-        viewModelScope.launch {
-            repository.dismiss(impulseId, type)
-        }
-    }
-
-    fun togglePartnerFlag(impulseId: UUID) {
-        viewModelScope.launch {
-            repository.togglePartnerFlag(impulseId)
         }
     }
 }

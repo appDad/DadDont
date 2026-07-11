@@ -1,40 +1,21 @@
 package com.egabel.daddont.data.model
 
-data class TierDurations(
-    val redMs: Long,
-    val yellowMs: Long,
-    val greenMs: Long,
-    val grayAfterMs: Long
-)
-
+/**
+ * Tier determines the default decision window: how long an impulse cools
+ * before a verdict is due. Within the window, the first half is RED and
+ * the second half is YELLOW; past decideBy it's GREEN until a verdict.
+ */
 object CoolingConfig {
     private const val HOUR = 3_600_000L
     private const val DAY = 86_400_000L
 
-    var low = TierDurations(
-        redMs = 1 * HOUR,
-        yellowMs = 3 * HOUR,
-        greenMs = 12 * HOUR,
-        grayAfterMs = 24 * HOUR
-    )
+    var lowWindowMs = 24 * HOUR
+    var mediumWindowMs = 7 * DAY
+    var highWindowMs = 30 * DAY
 
-    var medium = TierDurations(
-        redMs = 1 * DAY,
-        yellowMs = 2 * DAY,
-        greenMs = 4 * DAY,
-        grayAfterMs = 7 * DAY
-    )
-
-    var high = TierDurations(
-        redMs = 3 * DAY,
-        yellowMs = 7 * DAY,
-        greenMs = 14 * DAY,
-        grayAfterMs = 30 * DAY
-    )
-
-    fun durationsFor(tier: Tier): TierDurations = when (tier) {
-        Tier.LOW -> low
-        Tier.MEDIUM -> medium
-        Tier.HIGH -> high
+    fun windowFor(tier: Tier): Long = when (tier) {
+        Tier.LOW -> lowWindowMs
+        Tier.MEDIUM -> mediumWindowMs
+        Tier.HIGH -> highWindowMs
     }
 }

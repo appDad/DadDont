@@ -1,71 +1,52 @@
 package com.egabel.daddont.data.model
 
+/**
+ * Verdict-required lifecycle:
+ *
+ *   PENDING — awaiting classification (no decideBy yet)
+ *   RED     — first half of the cooling window
+ *   YELLOW  — second half of the cooling window
+ *   GREEN   — past decideBy. A verdict is DUE. This state never expires;
+ *             it escalates (overdue time grows) until the user decides.
+ *   GRAY    — verdict recorded. The ONLY way in is an explicit decision.
+ */
 object ImpulseStateCalculator {
+
     fun computeState(impulse: Impulse, now: Long = System.currentTimeMillis()): ImpulseState {
-        if (impulse.dismissedAt != null) return ImpulseState.GRAY
+        if (impulse.verdict != null) return ImpulseState.GRAY
 
-        val tier = impulse.tier ?: return ImpulseState.PENDING
+        val decideBy = impulse.decideBy ?: return ImpulseState.PENDING
         val start = impulse.classifiedAt ?: impulse.createdAt
+
+        if (now >= decideBy) return ImpulseState.GREEN
+
+        val window = (decideBy - start).coerceAtLeast(1)
         val elapsed = now - start
-
-        // Custom endpoint: split the window proportionally (40% red, 30% yellow, 30% green)
-        val customUntil = impulse.customCoolUntil
-        if (customUntil != null) {
-            val totalMs = (customUntil - start).coerceAtLeast(1)
-            val redEnd = (totalMs * 0.40).toLong()
-            val yellowEnd = (totalMs * 0.70).toLong()
-            return when {
-                elapsed < redEnd -> ImpulseState.RED
-                elapsed < yellowEnd -> ImpulseState.YELLOW
-                elapsed < totalMs -> ImpulseState.GREEN
-                else -> ImpulseState.GRAY
-            }
-        }
-
-        // Standard tier-based durations
-        val durations = CoolingConfig.durationsFor(tier)
-        return when {
-            elapsed < durations.redMs -> ImpulseState.RED
-            elapsed < durations.redMs + durations.yellowMs -> ImpulseState.YELLOW
-            elapsed < durations.redMs + durations.yellowMs + durations.greenMs -> ImpulseState.GREEN
-            elapsed >= durations.grayAfterMs -> ImpulseState.GRAY
-            else -> ImpulseState.GREEN
-        }
+        return if (elapsed < window / 2) ImpulseState.RED else ImpulseState.YELLOW
     }
 
     /**
-     * Returns milliseconds until the next state transition, or null if
-     * the impulse is PENDING, GRAY, or dismissed.
+     * Milliseconds until the next state transition (RED→YELLOW or →GREEN),
+     * or null when PENDING, GREEN (nothing "next" — a decision is due), or GRAY.
      */
     fun msUntilNextState(impulse: Impulse, now: Long = System.currentTimeMillis()): Long? {
-        if (impulse.dismissedAt != null) return null
-        val tier = impulse.tier ?: return null
+        if (impulse.verdict != null) return null
+        val decideBy = impulse.decideBy ?: return null
+        if (now >= decideBy) return null
+
         val start = impulse.classifiedAt ?: impulse.createdAt
+        val window = (decideBy - start).coerceAtLeast(1)
         val elapsed = now - start
+        val halfway = window / 2
 
-        // Custom endpoint
-        val customUntil = impulse.customCoolUntil
-        if (customUntil != null) {
-            val totalMs = (customUntil - start).coerceAtLeast(1)
-            val redEnd = (totalMs * 0.40).toLong()
-            val yellowEnd = (totalMs * 0.70).toLong()
-            val nextBoundary = when {
-                elapsed < redEnd -> redEnd
-                elapsed < yellowEnd -> yellowEnd
-                elapsed < totalMs -> totalMs
-                else -> return null
-            }
-            return (nextBoundary - elapsed).coerceAtLeast(0)
-        }
+        val nextBoundary = if (elapsed < halfway) start + halfway else decideBy
+        return (nextBoundary - now).coerceAtLeast(0)
+    }
 
-        // Standard tier-based
-        val durations = CoolingConfig.durationsFor(tier)
-        val nextBoundary = when {
-            elapsed < durations.redMs -> durations.redMs
-            elapsed < durations.redMs + durations.yellowMs -> durations.redMs + durations.yellowMs
-            elapsed < durations.redMs + durations.yellowMs + durations.greenMs -> durations.grayAfterMs
-            else -> return null
-        }
-        return (nextBoundary - elapsed).coerceAtLeast(0)
+    /** How long a GREEN impulse has been awaiting a verdict; null otherwise. */
+    fun overdueMs(impulse: Impulse, now: Long = System.currentTimeMillis()): Long? {
+        if (impulse.verdict != null) return null
+        val decideBy = impulse.decideBy ?: return null
+        return if (now >= decideBy) now - decideBy else null
     }
 }

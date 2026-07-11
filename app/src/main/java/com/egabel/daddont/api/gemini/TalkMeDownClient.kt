@@ -2,6 +2,8 @@ package com.egabel.daddont.api.gemini
 
 import android.content.Context
 import android.util.Log
+import com.egabel.daddont.data.model.DesireCheckIn
+import com.egabel.daddont.data.model.Impulse
 import com.egabel.daddont.data.model.ReturnEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,6 +11,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class Reclassification(
     val tier: String?,
@@ -32,18 +37,13 @@ class TalkMeDownClient(private val context: Context) {
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun chat(
-        impulseText: String,
-        currentTier: String?,
-        currentCategory: String?,
-        currentPartnerGate: Boolean,
+        impulse: Impulse,
+        desireCurve: List<DesireCheckIn>,
         returnLog: List<ReturnEvent>,
         priorTranscript: String?,
         userMessage: String
     ): DialogResult = withContext(Dispatchers.IO) {
-        val systemContext = buildSystemContext(
-            impulseText, currentTier, currentCategory, currentPartnerGate,
-            returnLog, priorTranscript
-        )
+        val systemContext = buildSystemContext(impulse, desireCurve, returnLog, priorTranscript)
         val prompt = """
 $systemContext
 
@@ -81,8 +81,7 @@ Return ONLY raw JSON. No markdown fences, no explanation outside the JSON.
                 ?: return DialogResult(raw, null)
 
             val reclassify = obj["reclassify"]?.let { element ->
-                if (element.jsonPrimitive?.content == "null" ||
-                    element.toString() == "null") {
+                if (element.toString() == "null") {
                     null
                 } else {
                     val r = element.jsonObject
@@ -103,19 +102,27 @@ Return ONLY raw JSON. No markdown fences, no explanation outside the JSON.
     }
 
     private fun buildSystemContext(
-        impulseText: String,
-        currentTier: String?,
-        currentCategory: String?,
-        currentPartnerGate: Boolean,
+        impulse: Impulse,
+        desireCurve: List<DesireCheckIn>,
         returnLog: List<ReturnEvent>,
         priorTranscript: String?
     ): String {
+        val dateFmt = SimpleDateFormat("MMM d", Locale.getDefault())
+
+        val curveText = if (desireCurve.isEmpty()) {
+            "No desire readings recorded."
+        } else {
+            desireCurve.joinToString(" → ") {
+                "${it.strength}/10 (${dateFmt.format(Date(it.timestamp))})"
+            }
+        }
+
         val returnHistory = if (returnLog.isEmpty()) {
             "No prior returns."
         } else {
             returnLog.mapIndexed { i, event ->
                 val reason = event.rationale?.let { " — \"$it\"" } ?: ""
-                "  Return #${i + 1}$reason"
+                "  Return #${i + 1} (${dateFmt.format(Date(event.timestamp))})$reason"
             }.joinToString("\n")
         }
 
@@ -123,20 +130,34 @@ Return ONLY raw JSON. No markdown fences, no explanation outside the JSON.
             "\n\nPrior conversation about this impulse:\n$priorTranscript"
         } else ""
 
-        return """
-You are an incisive friend helping someone examine an impulse they're wrestling with. Not a therapist, not a motivational poster — an honest friend who knows the history.
+        val prediction = impulse.prediction?.let {
+            "\nAt capture, they predicted they would ${
+                if (it.name == "STILL_WANT") "STILL WANT this once it cooled"
+                else "have MOVED ON by the time it cooled"
+            }."
+        } ?: ""
 
-The impulse: "$impulseText"
-Current classification: tier=${currentTier ?: "ungraded"}, category=${currentCategory ?: "ungraded"}, partnerGate=$currentPartnerGate
-Times it has returned: ${returnLog.size}
+        return """
+You are an incisive friend helping someone examine an impulse they're wrestling with. Not a therapist, not a motivational poster — an honest friend who knows the full history.
+
+The impulse: "${impulse.content}"
+Current classification: tier=${impulse.tier?.name ?: "ungraded"}, category=${impulse.category?.name ?: "ungraded"}, partnerGate=${impulse.partnerGate}
+Their stated reason at capture: ${impulse.rationale ?: "none recorded"}
+Likely trigger: ${impulse.trigger ?: "unknown"}
+Estimated cost: ${impulse.estimatedCost?.let { "$$it" } ?: "n/a"}$prediction
+
+Desire over time: $curveText
+Times it has returned: ${returnLog.size} (deferred ${impulse.deferCount}x)
 Return history:
 $returnHistory$priorContext
 
 Your approach:
-- Surface the user's own prior reasons for letting go
+- Use the desire curve as evidence. If it's decaying, show them their own numbers. If it's holding steady or climbing, acknowledge that honestly — maybe they really want this.
+- Compare against their capture-time prediction if one exists
+- Reference their own stated rationale and interrogate it gently
 - Reference their history concretely ("You've been here three times...")
 - Ask honest questions, don't lecture
-- If they have good reasons this time, acknowledge it
+- If they have good reasons this time, say so
 - Keep responses conversational and under 150 words
 - Don't be preachy or use clichés
 - If the conversation reveals the impulse was misclassified (wrong tier, wrong category, should/shouldn't involve partner), silently update the classification in your reclassify field

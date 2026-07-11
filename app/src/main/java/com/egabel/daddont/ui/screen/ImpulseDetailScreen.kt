@@ -2,6 +2,7 @@ package com.egabel.daddont.ui.screen
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,12 +25,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -43,6 +48,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -57,25 +64,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.egabel.daddont.data.model.DismissalType
+import com.egabel.daddont.data.model.DesireCheckIn
 import com.egabel.daddont.data.model.ImpulseState
+import com.egabel.daddont.data.model.Prediction
+import com.egabel.daddont.data.model.Verdict
 import com.egabel.daddont.ui.theme.BgLight
 import com.egabel.daddont.ui.theme.BlueLeft
 import com.egabel.daddont.ui.theme.BorderColor
+import com.egabel.daddont.ui.theme.GreenState
 import com.egabel.daddont.ui.theme.ImpulseColors
 import com.egabel.daddont.ui.theme.PartnerBadge
 import com.egabel.daddont.ui.theme.RedState
@@ -88,6 +100,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -97,20 +110,30 @@ fun ImpulseDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showReturnDialog by remember { mutableStateOf(false) }
-    var returnRationale by remember { mutableStateOf("") }
 
-    // Edit state
     var isEditing by remember { mutableStateOf(false) }
     var editText by remember { mutableStateOf("") }
-
-    // Delete confirmation
     var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    // Return flow
+    var showReturnDialog by remember { mutableStateOf(false) }
+    var returnRationale by remember { mutableStateOf("") }
+    var returnDesire by remember { mutableFloatStateOf(7f) }
+
+    // Check-in flow
+    var showCheckIn by remember { mutableStateOf(false) }
+    var checkInDesire by remember { mutableFloatStateOf(5f) }
+
+    // Defer flow
+    var showDeferDialog by remember { mutableStateOf(false) }
 
     // Cool-until picker flow: date → time
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var pickedDateMs by remember { mutableStateOf(0L) }
+    // Where the picked timestamp should go: true = defer, false = plain decideBy edit
+    var pickerIsForDefer by remember { mutableStateOf(false) }
+    var deferReason by remember { mutableStateOf("") }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
@@ -119,7 +142,6 @@ fun ImpulseDetailScreen(
         }
     }
 
-    // ── Delete confirmation dialog ───────────────────────────────────
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
@@ -142,7 +164,83 @@ fun ImpulseDetailScreen(
         )
     }
 
-    // ── Date picker dialog ───────────────────────────────────────────
+    // ── Defer dialog: reason + duration chips or custom date ─────────
+    if (showDeferDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeferDialog = false },
+            title = { Text("Defer the decision", fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column {
+                    Text(
+                        "Not deciding is a decision too — say why, and pick a new deadline.",
+                        fontSize = 13.sp, color = TextMid
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = deferReason,
+                        onValueChange = { deferReason = it },
+                        placeholder = { Text("Why defer? (required)", color = TextDim) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BlueLeft,
+                            unfocusedBorderColor = BorderColor
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            "Tomorrow" to 86_400_000L,
+                            "3 days" to 3 * 86_400_000L,
+                            "1 week" to 7 * 86_400_000L
+                        ).forEach { (label, ms) ->
+                            FilterChip(
+                                selected = false,
+                                onClick = {
+                                    if (deferReason.isNotBlank()) {
+                                        viewModel.defer(
+                                            System.currentTimeMillis() + ms,
+                                            deferReason.trim()
+                                        )
+                                        deferReason = ""
+                                        showDeferDialog = false
+                                    }
+                                },
+                                enabled = deferReason.isNotBlank(),
+                                label = { Text(label, fontSize = 12.sp) },
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                        }
+                        FilterChip(
+                            selected = false,
+                            onClick = {
+                                if (deferReason.isNotBlank()) {
+                                    pickerIsForDefer = true
+                                    showDeferDialog = false
+                                    showDatePicker = true
+                                }
+                            },
+                            enabled = deferReason.isNotBlank(),
+                            label = { Text("Pick date…", fontSize = 12.sp) },
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showDeferDialog = false }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            shape = RoundedCornerShape(14.dp)
+        )
+    }
+
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = System.currentTimeMillis() + 86_400_000L
@@ -171,7 +269,6 @@ fun ImpulseDetailScreen(
         }
     }
 
-    // ── Time picker dialog ───────────────────────────────────────────
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState(initialHour = 20, initialMinute = 0)
         AlertDialog(
@@ -182,7 +279,7 @@ fun ImpulseDetailScreen(
                 TextButton(onClick = {
                     // DatePicker returns UTC midnight — extract y/m/d in UTC,
                     // then build the target in the device's local timezone.
-                    val utcCal = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+                    val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
                         timeInMillis = pickedDateMs
                     }
                     val cal = Calendar.getInstance().apply {
@@ -194,7 +291,12 @@ fun ImpulseDetailScreen(
                         set(Calendar.SECOND, 0)
                         set(Calendar.MILLISECOND, 0)
                     }
-                    viewModel.setCustomCoolUntil(cal.timeInMillis)
+                    if (pickerIsForDefer) {
+                        viewModel.defer(cal.timeInMillis, deferReason.trim().ifEmpty { "deferred" })
+                        deferReason = ""
+                    } else {
+                        viewModel.setDecideBy(cal.timeInMillis)
+                    }
                     showTimePicker = false
                 }) {
                     Text("Set", color = BlueLeft)
@@ -269,6 +371,115 @@ fun ImpulseDetailScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ── VERDICT PANEL — pinned first when a decision is due ──────
+            if (state == ImpulseState.GREEN) {
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.5.dp, GreenState)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Verdict time",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GreenState
+                                )
+                                impulseWithState.overdueMs?.let { overdue ->
+                                    if (overdue > 86_400_000L) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "${overdue / 86_400_000L}d overdue",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = RedState
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Prediction callback — confront them with their own forecast
+                            impulse.prediction?.let { p ->
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = when (p) {
+                                        Prediction.STILL_WANT ->
+                                            "When you captured this, you predicted you'd still want it."
+                                        Prediction.MOVED_ON ->
+                                            "When you captured this, you predicted you'd have moved on by now."
+                                    },
+                                    fontSize = 13.sp,
+                                    fontStyle = FontStyle.Italic,
+                                    color = TextMid
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Button(
+                                    onClick = { viewModel.recordVerdict(Verdict.DID_IT) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = BlueLeft)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Check, contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Did it", fontSize = 14.sp)
+                                }
+                                Button(
+                                    onClick = { viewModel.recordVerdict(Verdict.KILLED) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = RedState)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close, contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Kill it", fontSize = 14.sp)
+                                }
+                            }
+
+                            if (impulse.partnerGate) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    NoteChip("Partner approved") {
+                                        viewModel.recordVerdict(Verdict.DID_IT, "Partner approved")
+                                    }
+                                    NoteChip("Partner declined") {
+                                        viewModel.recordVerdict(Verdict.KILLED, "Partner declined")
+                                    }
+                                    NoteChip("Decided not to ask") {
+                                        viewModel.recordVerdict(Verdict.KILLED, "Decided not to ask")
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+                            TextButton(onClick = { showDeferDialog = true }) {
+                                Icon(
+                                    Icons.Default.Schedule, contentDescription = null,
+                                    modifier = Modifier.size(15.dp), tint = TextDim
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Not ready — defer with a reason", fontSize = 13.sp, color = TextDim)
+                            }
+                        }
+                    }
+                }
+            }
+
             // ── Header card ──────────────────────────────────────────────
             item {
                 Surface(
@@ -278,16 +489,14 @@ fun ImpulseDetailScreen(
                     border = BorderStroke(1.dp, BorderColor)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        // Left accent bar
                         Box(
                             modifier = Modifier
                                 .width(4.dp)
-                                .height(160.dp)
+                                .height(200.dp)
                                 .background(stateColor)
                         )
 
                         Column(modifier = Modifier.padding(16.dp).weight(1f)) {
-                            // State row
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -302,7 +511,7 @@ fun ImpulseDetailScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = ImpulseColors.label(state),
+                                        text = detailStateLabel(state, impulse.verdict),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = stateColor
@@ -336,7 +545,6 @@ fun ImpulseDetailScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Impulse content — inline edit or display
                             if (isEditing) {
                                 OutlinedTextField(
                                     value = editText,
@@ -345,9 +553,7 @@ fun ImpulseDetailScreen(
                                     shape = RoundedCornerShape(14.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = BlueLeft,
-                                        unfocusedBorderColor = BorderColor,
-                                        focusedContainerColor = Color.White,
-                                        unfocusedContainerColor = Color.White
+                                        unfocusedBorderColor = BorderColor
                                     )
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -377,30 +583,50 @@ fun ImpulseDetailScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Metadata row
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            // Why they wanted it — captured mental state
+                            impulse.rationale?.let { why ->
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = impulse.tier?.name ?: "Ungraded",
-                                    fontSize = 11.sp,
-                                    color = TextDim
+                                    text = "Why: $why",
+                                    fontSize = 13.sp,
+                                    color = TextMid
                                 )
+                            }
+                            impulse.trigger?.let { trig ->
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = impulse.category?.name ?: "",
-                                    fontSize = 11.sp,
-                                    color = TextDim
-                                )
-                                Text(
-                                    text = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
-                                        .format(Date(impulse.createdAt)),
-                                    fontSize = 11.sp,
+                                    text = "Trigger: $trig",
+                                    fontSize = 12.sp,
                                     color = TextDim
                                 )
                             }
 
-                            // Custom cool-until indicator
-                            impulse.customCoolUntil?.let { coolUntil ->
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text(
+                                    text = impulse.tier?.name ?: "Ungraded",
+                                    fontSize = 11.sp, color = TextDim
+                                )
+                                Text(
+                                    text = impulse.category?.name ?: "",
+                                    fontSize = 11.sp, color = TextDim
+                                )
+                                impulse.estimatedCost?.let {
+                                    Text(
+                                        text = "$${"%,.0f".format(it)}",
+                                        fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                                        color = TextMid
+                                    )
+                                }
+                                Text(
+                                    text = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+                                        .format(Date(impulse.createdAt)),
+                                    fontSize = 11.sp, color = TextDim
+                                )
+                            }
+
+                            impulse.decideBy?.let { decideBy ->
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
@@ -411,7 +637,7 @@ fun ImpulseDetailScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Cools at ${SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(coolUntil))}",
+                                        text = "Verdict due ${SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(decideBy))}",
                                         fontSize = 11.sp,
                                         color = BlueLeft
                                     )
@@ -429,12 +655,124 @@ fun ImpulseDetailScreen(
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
-
                             Text(
-                                text = "Returned ${impulse.returnCount}x · Reactivated ${impulse.reactivationCount}x",
+                                text = "Returned ${impulse.returnCount}x · Deferred ${impulse.deferCount}x · Reactivated ${impulse.reactivationCount}x",
                                 fontSize = 11.sp,
                                 color = TextDim
                             )
+                        }
+                    }
+                }
+            }
+
+            // ── Desire curve ─────────────────────────────────────────────
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, BorderColor)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Desire over time",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextMid
+                            )
+                            uiState.desireCurve.lastOrNull()?.let {
+                                Text(
+                                    text = "now ${it.strength}/10",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = BlueLeft
+                                )
+                            }
+                        }
+
+                        if (uiState.desireCurve.size >= 2) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            DesireSparkline(
+                                curve = uiState.desireCurve,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                            )
+                            val first = uiState.desireCurve.first().strength
+                            val last = uiState.desireCurve.last().strength
+                            if (first != last) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = if (last < first)
+                                        "Down ${first - last} points since capture — it's fading."
+                                    else
+                                        "Up ${last - first} points since capture — this one's persistent.",
+                                    fontSize = 12.sp,
+                                    color = if (last < first) GreenState else RedState
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Check in when it hits you again — the curve is the evidence.",
+                                fontSize = 12.sp,
+                                color = TextDim
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        if (state != ImpulseState.GRAY) {
+                            if (!showCheckIn) {
+                                OutlinedButton(
+                                    onClick = { showCheckIn = true },
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, BorderColor)
+                                ) {
+                                    Text("How strong is it right now?", color = TextMid, fontSize = 13.sp)
+                                }
+                            } else {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Slider(
+                                        value = checkInDesire,
+                                        onValueChange = { checkInDesire = it },
+                                        valueRange = 1f..10f,
+                                        steps = 8,
+                                        modifier = Modifier.weight(1f),
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = BlueLeft,
+                                            activeTrackColor = BlueLeft
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "${checkInDesire.toInt()}",
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = BlueLeft
+                                    )
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.checkInDesire(checkInDesire.toInt())
+                                            showCheckIn = false
+                                        },
+                                        shape = RoundedCornerShape(14.dp),
+                                        border = BorderStroke(1.dp, BlueLeft)
+                                    ) {
+                                        Text("Record", color = BlueLeft, fontSize = 13.sp)
+                                    }
+                                    TextButton(onClick = { showCheckIn = false }) {
+                                        Text("Cancel", color = TextDim, fontSize = 13.sp)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -449,14 +787,16 @@ fun ImpulseDetailScreen(
                     border = BorderStroke(1.dp, BorderColor)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        // Cool-until button (only for active, non-gray impulses)
-                        if (state != ImpulseState.GRAY && state != ImpulseState.PENDING) {
+                        if (state == ImpulseState.RED || state == ImpulseState.YELLOW) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 OutlinedButton(
-                                    onClick = { showDatePicker = true },
+                                    onClick = {
+                                        pickerIsForDefer = false
+                                        showDatePicker = true
+                                    },
                                     shape = RoundedCornerShape(14.dp),
                                     border = BorderStroke(1.dp, BlueLeft),
                                     modifier = Modifier.weight(1f)
@@ -468,16 +808,7 @@ fun ImpulseDetailScreen(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Cool until…", color = BlueLeft, fontSize = 13.sp)
-                                }
-                                if (impulse.customCoolUntil != null) {
-                                    OutlinedButton(
-                                        onClick = { viewModel.setCustomCoolUntil(null) },
-                                        shape = RoundedCornerShape(14.dp),
-                                        border = BorderStroke(1.dp, BorderColor)
-                                    ) {
-                                        Text("Reset", color = TextDim, fontSize = 13.sp)
-                                    }
+                                    Text("Change deadline…", color = BlueLeft, fontSize = 13.sp)
                                 }
                             }
                             Spacer(modifier = Modifier.height(10.dp))
@@ -498,7 +829,7 @@ fun ImpulseDetailScreen(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Impulse returned", color = TextMid, fontSize = 14.sp)
+                                    Text("It's back on my mind", color = TextMid, fontSize = 14.sp)
                                 }
                             } else {
                                 Surface(
@@ -507,6 +838,32 @@ fun ImpulseDetailScreen(
                                     border = BorderStroke(1.dp, BorderColor)
                                 ) {
                                     Column(modifier = Modifier.padding(14.dp)) {
+                                        Text(
+                                            text = "How strong right now?",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = TextMid
+                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Slider(
+                                                value = returnDesire,
+                                                onValueChange = { returnDesire = it },
+                                                valueRange = 1f..10f,
+                                                steps = 8,
+                                                modifier = Modifier.weight(1f),
+                                                colors = SliderDefaults.colors(
+                                                    thumbColor = BlueLeft,
+                                                    activeTrackColor = BlueLeft
+                                                )
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "${returnDesire.toInt()}",
+                                                fontSize = 18.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = BlueLeft
+                                            )
+                                        }
                                         OutlinedTextField(
                                             value = returnRationale,
                                             onValueChange = { returnRationale = it },
@@ -527,7 +884,10 @@ fun ImpulseDetailScreen(
                                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                             OutlinedButton(
                                                 onClick = {
-                                                    viewModel.recordReturn(returnRationale.ifBlank { null })
+                                                    viewModel.recordReturn(
+                                                        returnRationale.ifBlank { null },
+                                                        returnDesire.toInt()
+                                                    )
                                                     returnRationale = ""
                                                     showReturnDialog = false
                                                 },
@@ -548,9 +908,29 @@ fun ImpulseDetailScreen(
                             }
                         }
 
-                        if (state == ImpulseState.GRAY && impulse.dismissedAt != null) {
+                        if (state == ImpulseState.GRAY) {
+                            impulse.verdict?.let { v ->
+                                Text(
+                                    text = when (v) {
+                                        Verdict.DID_IT -> "Verdict: Did it"
+                                        Verdict.KILLED -> "Verdict: Killed"
+                                    } + (impulse.verdictNote?.let { " — $it" } ?: ""),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextMid
+                                )
+                                impulse.verdictAt?.let {
+                                    Text(
+                                        text = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+                                            .format(Date(it)),
+                                        fontSize = 11.sp,
+                                        color = TextDim
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
                             OutlinedButton(
-                                onClick = { viewModel.recordReturn() },
+                                onClick = { viewModel.reactivate() },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(14.dp),
                                 border = BorderStroke(1.dp, BorderColor)
@@ -562,49 +942,8 @@ fun ImpulseDetailScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Reactivate", color = TextMid, fontSize = 14.sp)
+                                Text("It's back — reactivate", color = TextMid, fontSize = 14.sp)
                             }
-                        }
-
-                        if (state == ImpulseState.GREEN) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "Cooled — your call",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = ImpulseColors.borderColor(ImpulseState.GREEN)
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            if (impulse.partnerGate) {
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    DismissChip("Love of your life approved") {
-                                        viewModel.dismiss(DismissalType.PARTNER_APPROVED)
-                                    }
-                                    DismissChip("Love of your life declined") {
-                                        viewModel.dismiss(DismissalType.PARTNER_DECLINED)
-                                    }
-                                    DismissChip("Decided not to ask") {
-                                        viewModel.dismiss(DismissalType.DECIDED_NOT_TO_ASK)
-                                    }
-                                }
-                            } else {
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    DismissChip("Done / Executed") {
-                                        viewModel.dismiss(DismissalType.DONE)
-                                    }
-                                    DismissChip("No longer want") {
-                                        viewModel.dismiss(DismissalType.NO_LONGER_WANT)
-                                    }
-                                }
-                            }
-
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -733,7 +1072,7 @@ fun ImpulseDetailScreen(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "Return History",
+                                text = "History",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = TextMid
@@ -780,9 +1119,41 @@ fun ImpulseDetailScreen(
     }
 }
 
+// ── Components ───────────────────────────────────────────────────────
+
+@Composable
+private fun DesireSparkline(curve: List<DesireCheckIn>, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        if (curve.size < 2) return@Canvas
+        val minT = curve.first().timestamp
+        val maxT = curve.last().timestamp
+        val spanT = (maxT - minT).coerceAtLeast(1)
+
+        val points = curve.map { checkIn ->
+            Offset(
+                x = (checkIn.timestamp - minT).toFloat() / spanT * size.width,
+                y = size.height - ((checkIn.strength - 1) / 9f * size.height)
+            )
+        }
+
+        for (i in 0 until points.size - 1) {
+            drawLine(
+                color = Color(0xFF1A60A5),
+                start = points[i],
+                end = points[i + 1],
+                strokeWidth = 3f,
+                cap = StrokeCap.Round
+            )
+        }
+        points.forEach { p ->
+            drawCircle(color = Color(0xFF1A60A5), radius = 5f, center = p)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DismissChip(label: String, onClick: () -> Unit) {
+private fun NoteChip(label: String, onClick: () -> Unit) {
     FilterChip(
         selected = false,
         onClick = onClick,
@@ -799,6 +1170,18 @@ private fun DismissChip(label: String, onClick: () -> Unit) {
             labelColor = TextMid
         )
     )
+}
+
+private fun detailStateLabel(state: ImpulseState, verdict: Verdict?): String = when (state) {
+    ImpulseState.PENDING -> "Classifying…"
+    ImpulseState.RED -> "Hot"
+    ImpulseState.YELLOW -> "Cooling"
+    ImpulseState.GREEN -> "Decide"
+    ImpulseState.GRAY -> when (verdict) {
+        Verdict.DID_IT -> "Did it"
+        Verdict.KILLED -> "Killed"
+        null -> "Archived"
+    }
 }
 
 private fun formatCountdown(ms: Long): String {

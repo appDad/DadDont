@@ -2,8 +2,9 @@ package com.egabel.daddont.data.db
 
 import androidx.room.TypeConverter
 import com.egabel.daddont.data.model.Category
-import com.egabel.daddont.data.model.DismissalType
+import com.egabel.daddont.data.model.Prediction
 import com.egabel.daddont.data.model.Tier
+import com.egabel.daddont.data.model.Verdict
 import java.util.UUID
 
 class Converters {
@@ -26,8 +27,14 @@ class Converters {
     fun toCategory(value: String?): Category? = value?.let { Category.valueOf(it) }
 
     @TypeConverter
-    fun fromDismissalType(value: DismissalType?): String? = value?.name
+    fun fromVerdict(value: Verdict?): String? = value?.name
 
     @TypeConverter
-    fun toDismissalType(value: String?): DismissalType? = value?.let { DismissalType.valueOf(it) }
+    fun toVerdict(value: String?): Verdict? = value?.let { Verdict.valueOf(it) }
+
+    @TypeConverter
+    fun fromPrediction(value: Prediction?): String? = value?.name
+
+    @TypeConverter
+    fun toPrediction(value: String?): Prediction? = value?.let { Prediction.valueOf(it) }
 }

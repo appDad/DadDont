@@ -20,13 +20,13 @@ interface ImpulseDao {
     @Delete
     suspend fun delete(impulse: Impulse)
 
-    @Query("SELECT * FROM impulses WHERE dismissedAt IS NULL ORDER BY createdAt DESC")
+    @Query("SELECT * FROM impulses WHERE verdict IS NULL ORDER BY createdAt DESC")
     fun observeActive(): Flow<List<Impulse>>
 
-    @Query("SELECT * FROM impulses WHERE dismissedAt IS NOT NULL ORDER BY dismissedAt DESC")
+    @Query("SELECT * FROM impulses WHERE verdict IS NOT NULL ORDER BY verdictAt DESC")
     fun observeArchived(): Flow<List<Impulse>>
 
-    @Query("SELECT * FROM impulses WHERE partnerGate = 1 ORDER BY createdAt DESC")
+    @Query("SELECT * FROM impulses WHERE partnerGate = 1 AND verdict IS NULL ORDER BY createdAt DESC")
     fun observePartnerFlagged(): Flow<List<Impulse>>
 
     @Query("SELECT * FROM impulses WHERE ungraded = 1")
@@ -38,15 +38,12 @@ interface ImpulseDao {
     @Query("SELECT * FROM impulses WHERE id = :id")
     fun observeById(id: UUID): Flow<Impulse?>
 
-    @Query("SELECT * FROM impulses ORDER BY createdAt DESC")
-    fun observeAll(): Flow<List<Impulse>>
+    @Query("SELECT * FROM impulses")
+    suspend fun getAll(): List<Impulse>
 
-    @Query("SELECT COUNT(*) FROM impulses WHERE dismissedAt IS NOT NULL AND dismissedAt > :since")
-    suspend fun countDismissedSince(since: Long): Int
+    @Query("SELECT * FROM impulses WHERE verdict IS NULL AND decideBy IS NOT NULL AND decideBy <= :now")
+    suspend fun getAwaitingVerdict(now: Long): List<Impulse>
 
-    @Query("SELECT COUNT(*) FROM impulses WHERE dismissedAt IS NULL")
-    suspend fun countActive(): Int
-
-    @Query("SELECT * FROM impulses WHERE dismissedAt IS NULL ORDER BY returnCount DESC LIMIT :limit")
+    @Query("SELECT * FROM impulses WHERE verdict IS NULL ORDER BY returnCount DESC LIMIT :limit")
     suspend fun topRecurrenceOffenders(limit: Int = 10): List<Impulse>
 }

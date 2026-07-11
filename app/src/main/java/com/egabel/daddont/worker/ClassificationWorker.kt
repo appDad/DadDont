@@ -12,6 +12,7 @@ import com.egabel.daddont.api.gemini.GeminiClient
 import com.egabel.daddont.data.model.Category
 import com.egabel.daddont.data.model.Tier
 import com.egabel.daddont.data.repository.ImpulseRepository
+import com.egabel.daddont.widget.WidgetUpdater
 import java.util.concurrent.TimeUnit
 
 class ClassificationWorker(
@@ -30,27 +31,37 @@ class ClassificationWorker(
         var failures = 0
         for (impulse in ungraded) {
             try {
-                val classification = gemini.classify(impulse.content)
-                if (classification == null) {
+                val c = gemini.classify(impulse.content)
+                if (c == null) {
                     failures++
                     continue
                 }
-                repository.updateClassification(
+                val classified = repository.applyClassification(
                     impulse.copy(
-                        tier = Tier.valueOf(classification.tier),
-                        category = Category.valueOf(classification.category),
-                        classifiedAt = System.currentTimeMillis(),
-                        partnerGate = classification.partnerGate,
-                        partnerReason = classification.partnerReason.ifEmpty { null },
-                        ungraded = false
+                        tier = Tier.valueOf(c.tier),
+                        category = Category.valueOf(c.category),
+                        partnerGate = c.partnerGate,
+                        partnerReason = c.partnerReason.ifEmpty { null },
+                        trigger = c.trigger ?: impulse.trigger,
+                        rationale = c.rationale ?: impulse.rationale,
+                        estimatedCost = impulse.estimatedCost ?: c.estimatedCostUsd,
+                        desireAtCapture = impulse.desireAtCapture ?: c.desireStrength
                     )
                 )
+                // Seed the desire curve if the user never set a slider value
+                if (impulse.desireAtCapture == null && c.desireStrength != null) {
+                    repository.addDesireCheckIn(impulse.id, c.desireStrength)
+                }
+                classified.decideBy?.let {
+                    VerdictWorker.schedule(applicationContext, classified.id, it)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to classify impulse ${impulse.id}", e)
                 failures++
             }
         }
 
+        WidgetUpdater.updateAll(applicationContext)
         return if (failures == ungraded.size) Result.retry() else Result.success()
     }
 

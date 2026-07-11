@@ -8,6 +8,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -48,12 +50,17 @@ class GeminiClient(private val context: Context) {
         val tier: String,
         val category: String,
         val partnerGate: Boolean,
-        val partnerReason: String
+        val partnerReason: String,
+        // Mental-state facets extracted from the capture text
+        val trigger: String?,
+        val rationale: String?,
+        val estimatedCostUsd: Double?,
+        val desireStrength: Int?
     )
 
     suspend fun classify(impulseText: String): ClassificationResult? = withContext(Dispatchers.IO) {
         val prompt = """
-You are a classification engine for an impulse-control app. Given an impulse description, return a JSON object with:
+You are the intake engine for an impulse-control app. The user captured an impulse, often as a voice ramble that includes their reasoning. Extract everything you can. Return a JSON object with:
 
 1. "tier" — stakes/consequence level:
    - LOW: small purchases, fleeting ideas, minor commitments
@@ -77,6 +84,14 @@ You are a classification engine for an impulse-control app. Given an impulse des
 
 4. "partnerReason" — if partnerGate is true, a short explanation of why. Empty string if false.
 
+5. "trigger" — what likely prompted this impulse right now, if inferable from the text (e.g. "saw a friend's new car", "stressful day"). null if not inferable.
+
+6. "rationale" — the user's own stated reason for wanting this, paraphrased in second person ("you want more cargo space for family trips"). null if they gave no reason.
+
+7. "estimatedCostUsd" — rough dollar cost if this is a purchase or has an obvious cost, as a number. null otherwise.
+
+8. "desireStrength" — 1-10, how intensely the user seems to want this based on their language. null if you can't tell.
+
 Return ONLY raw JSON. No markdown fences, no explanation.
 
 Impulse: "$impulseText"
@@ -91,7 +106,19 @@ Impulse: "$impulseText"
             val partnerGate = obj["partnerGate"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
             val partnerReason = obj["partnerReason"]?.jsonPrimitive?.content ?: ""
 
-            ClassificationResult(tier, category, partnerGate, partnerReason)
+            fun stringOrNull(key: String): String? =
+                obj[key]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() && it != "null" }
+
+            ClassificationResult(
+                tier = tier,
+                category = category,
+                partnerGate = partnerGate,
+                partnerReason = partnerReason,
+                trigger = stringOrNull("trigger"),
+                rationale = stringOrNull("rationale"),
+                estimatedCostUsd = obj["estimatedCostUsd"]?.jsonPrimitive?.doubleOrNull,
+                desireStrength = obj["desireStrength"]?.jsonPrimitive?.intOrNull?.coerceIn(1, 10)
+            )
         }.onFailure {
             Log.e(TAG, "JSON parse failed: $responseText", it)
         }.getOrNull()

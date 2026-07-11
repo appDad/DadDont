@@ -12,11 +12,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -34,7 +32,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +43,7 @@ import com.egabel.daddont.ui.theme.BgLight
 import com.egabel.daddont.ui.theme.BlueLeft
 import com.egabel.daddont.ui.theme.BorderColor
 import com.egabel.daddont.ui.theme.GreenState
+import com.egabel.daddont.ui.theme.PurpleRight
 import com.egabel.daddont.ui.theme.RedState
 import com.egabel.daddont.ui.theme.TextDim
 import com.egabel.daddont.ui.theme.TextMid
@@ -66,7 +64,7 @@ fun StatsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Stats",
+                        text = "Scorecard",
                         style = TextStyle(
                             brush = TitleGradient,
                             fontSize = 22.sp,
@@ -89,7 +87,8 @@ fun StatsScreen(
         },
         containerColor = BgLight
     ) { paddingValues ->
-        if (uiState.isLoading) {
+        val card = uiState.scorecard
+        if (uiState.isLoading || card == null) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -109,32 +108,90 @@ fun StatsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Money not spent — the headline number
             item {
                 StatCard(
-                    value = "${uiState.killedThisMonth}",
-                    label = "impulses killed this month that you never acted on",
+                    value = "$${"%,.0f".format(card.moneyNotSpent)}",
+                    label = "not spent — killed purchases, last 30 days",
                     accentColor = GreenState
                 )
             }
+
+            // Kill rate row
             item {
-                StatCard(
-                    value = "${uiState.stillCycling}",
-                    label = "impulses still cycling",
-                    accentColor = YellowState
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SmallStatCard(
+                        value = "${card.killedCount}",
+                        label = "killed",
+                        accentColor = GreenState,
+                        modifier = Modifier.weight(1f)
+                    )
+                    SmallStatCard(
+                        value = "${card.didItCount}",
+                        label = "did it",
+                        accentColor = BlueLeft,
+                        modifier = Modifier.weight(1f)
+                    )
+                    SmallStatCard(
+                        value = "${card.awaitingVerdict}",
+                        label = "awaiting verdict",
+                        accentColor = if (card.overdueCount > 0) RedState else YellowState,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
 
-            if (uiState.topOffenders.isNotEmpty()) {
+            if (card.overdueCount > 0) {
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = RedState.copy(alpha = 0.06f),
+                        border = BorderStroke(1.dp, RedState.copy(alpha = 0.4f))
+                    ) {
+                        Text(
+                            text = "${card.overdueCount} ${if (card.overdueCount == 1) "decision has" else "decisions have"} been waiting more than a day. Deciding is the whole point.",
+                            modifier = Modifier.padding(14.dp),
+                            fontSize = 13.sp,
+                            color = RedState
+                        )
+                    }
+                }
+            }
+
+            // Prediction accuracy
+            if (card.predictionsMade > 0) {
+                item {
+                    StatCard(
+                        value = "${card.predictionsCorrect}/${card.predictionsMade}",
+                        label = "predictions right — you said how you'd feel, here's how often you were right",
+                        accentColor = PurpleRight
+                    )
+                }
+            }
+
+            // Desire decay
+            card.avgDesireDecay?.let { decay ->
+                item {
+                    StatCard(
+                        value = if (decay >= 0) "-%.1f".format(decay) else "+%.1f".format(-decay),
+                        label = "average desire change from capture to latest check-in (out of 10)",
+                        accentColor = if (decay >= 0) GreenState else RedState
+                    )
+                }
+            }
+
+            if (card.topOffenders.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Top recurrence offenders",
+                        text = "Keeps coming back",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = TextMid
                     )
                 }
-                items(uiState.topOffenders) { impulse ->
+                items(card.topOffenders) { impulse ->
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
@@ -197,7 +254,7 @@ private fun StatCard(value: String, label: String, accentColor: Color) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = value,
-                    fontSize = 32.sp,
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     color = accentColor
                 )
@@ -208,6 +265,39 @@ private fun StatCard(value: String, label: String, accentColor: Color) {
                     color = TextDim
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SmallStatCard(
+    value: String,
+    label: String,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, BorderColor)
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = value,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = accentColor
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                color = TextDim
+            )
         }
     }
 }

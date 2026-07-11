@@ -1,6 +1,5 @@
 package com.egabel.daddont.ui.theme
 
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.egabel.daddont.data.model.ImpulseState
 
