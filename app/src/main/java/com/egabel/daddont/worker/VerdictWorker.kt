@@ -8,6 +8,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.egabel.daddont.DadDontApp
+import com.egabel.daddont.data.model.ImpulseKind
 import com.egabel.daddont.data.model.ImpulseState
 import com.egabel.daddont.data.model.ImpulseStateCalculator
 import com.egabel.daddont.data.repository.ImpulseRepository
@@ -37,7 +38,10 @@ class VerdictWorker(
         // Only notify if it's actually awaiting a verdict (deadline may have moved)
         val state = ImpulseStateCalculator.computeState(impulse)
         if (state == ImpulseState.GREEN) {
-            NotificationHelper.notifyVerdictDue(applicationContext, impulse.id, impulse.content)
+            NotificationHelper.notifyVerdictDue(
+                applicationContext, impulse.id, impulse.content,
+                isHold = impulse.kind == ImpulseKind.HOLD
+            )
         }
         WidgetUpdater.updateAll(applicationContext)
         return Result.success()

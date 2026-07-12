@@ -159,6 +159,52 @@ fun StatsScreen(
                 }
             }
 
+            // Holds survived
+            if (card.heldCount > 0) {
+                item {
+                    StatCard(
+                        value = "${card.heldCount}",
+                        label = "holds survived to their end time, last 30 days",
+                        accentColor = GreenState
+                    )
+                }
+            }
+
+            // Breaches & clean streak — only shown once there's a record
+            if (card.cleanStreakDays != null) {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SmallStatCard(
+                            value = "${card.slipCount}",
+                            label = "slips (30d)",
+                            accentColor = YellowState,
+                            modifier = Modifier.weight(1f)
+                        )
+                        SmallStatCard(
+                            value = "${card.brokeCount}",
+                            label = "gave up (30d)",
+                            accentColor = RedState,
+                            modifier = Modifier.weight(1f)
+                        )
+                        SmallStatCard(
+                            value = "${card.cleanStreakDays}d",
+                            label = "clean streak",
+                            accentColor = GreenState,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                if (card.moneySpentBreaking > 0) {
+                    item {
+                        StatCard(
+                            value = "$${"%,.0f".format(card.moneySpentBreaking)}",
+                            label = "spent by giving up early, last 30 days — this is what cooling protects",
+                            accentColor = RedState
+                        )
+                    }
+                }
+            }
+
             // Prediction accuracy
             if (card.predictionsMade > 0) {
                 item {

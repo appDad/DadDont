@@ -7,6 +7,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.egabel.daddont.DadDontApp
 import com.egabel.daddont.api.gemini.TalkMeDownClient
+import com.egabel.daddont.data.model.BreachEvent
 import com.egabel.daddont.data.model.Category
 import com.egabel.daddont.data.model.DesireCheckIn
 import com.egabel.daddont.data.model.ReturnEvent
@@ -35,6 +36,7 @@ data class ImpulseDetailUiState(
     val impulseWithState: ImpulseWithState? = null,
     val returnEvents: List<ReturnEvent> = emptyList(),
     val desireCurve: List<DesireCheckIn> = emptyList(),
+    val breachEvents: List<BreachEvent> = emptyList(),
     val dialogMessages: List<DialogMessage> = emptyList(),
     val isDialogLoading: Boolean = false,
     val dialogInput: String = "",
@@ -63,21 +65,24 @@ class ImpulseDetailViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     private val desireCurveFlow = repository.observeDesireCheckIns(impulseId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val breachEventsFlow = repository.observeBreachEvents(impulseId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val uiState: StateFlow<ImpulseDetailUiState> = combine(
-        impulseFlow, returnEventsFlow, desireCurveFlow, _dialogMessages,
-        _isDialogLoading, _dialogInput, _showTalkMeDown, _error
+        impulseFlow, returnEventsFlow, desireCurveFlow, breachEventsFlow,
+        _dialogMessages, _isDialogLoading, _dialogInput, _showTalkMeDown, _error
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         ImpulseDetailUiState(
             impulseWithState = values[0] as ImpulseWithState?,
             returnEvents = values[1] as List<ReturnEvent>,
             desireCurve = values[2] as List<DesireCheckIn>,
-            dialogMessages = values[3] as List<DialogMessage>,
-            isDialogLoading = values[4] as Boolean,
-            dialogInput = values[5] as String,
-            showTalkMeDown = values[6] as Boolean,
-            error = values[7] as String?
+            breachEvents = values[3] as List<BreachEvent>,
+            dialogMessages = values[4] as List<DialogMessage>,
+            isDialogLoading = values[5] as Boolean,
+            dialogInput = values[6] as String,
+            showTalkMeDown = values[7] as Boolean,
+            error = values[8] as String?
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ImpulseDetailUiState())
 
@@ -109,6 +114,14 @@ class ImpulseDetailViewModel(
             repository.getById(impulseId)?.impulse?.decideBy?.let {
                 VerdictWorker.schedule(getApplication(), impulseId, it)
             }
+            WidgetUpdater.updateAll(getApplication())
+        }
+    }
+
+    /** Slip: acted early, keeping going. Logs the breach, impulse stays live. */
+    fun recordSlip(note: String) {
+        viewModelScope.launch {
+            repository.recordSlip(impulseId, note)
             WidgetUpdater.updateAll(getApplication())
         }
     }
@@ -178,6 +191,7 @@ class ImpulseDetailViewModel(
                     desireCurve = desireCurve,
                     returnLog = returnEvents,
                     priorTranscript = priorTranscript,
+                    breachHistory = repository.breachSummary(),
                     userMessage = text
                 )
                 _dialogMessages.value = _dialogMessages.value + DialogMessage("assistant", result.response)

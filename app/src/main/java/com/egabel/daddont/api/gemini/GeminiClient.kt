@@ -55,10 +55,29 @@ class GeminiClient(private val context: Context) {
         val trigger: String?,
         val rationale: String?,
         val estimatedCostUsd: Double?,
-        val desireStrength: Int?
+        val desireStrength: Int?,
+        // HOLD contracts: resist until a hard stop
+        val kind: String,          // "DECISION" | "HOLD"
+        val holdUntilMs: Long?     // parsed end time for HOLD, epoch millis
     )
 
-    suspend fun classify(impulseText: String): ClassificationResult? = withContext(Dispatchers.IO) {
+    suspend fun classify(
+        impulseText: String,
+        breachHistory: String? = null
+    ): ClassificationResult? = withContext(Dispatchers.IO) {
+        val nowLocal = java.text.SimpleDateFormat(
+            "EEEE yyyy-MM-dd HH:mm", java.util.Locale.US
+        ).format(java.util.Date())
+
+        val reinforcement = breachHistory?.let {
+            """
+
+Reinforcement context — the user has previously BROKEN early on these impulses (acted before the cooling period ended):
+$it
+If this new impulse resembles a breach pattern (same category, similar want, similar trigger), assign the HIGHER tier so it cools longer. Breach-lookalikes must never get LOW.
+            """.trimIndent()
+        } ?: ""
+
         val prompt = """
 You are the intake engine for an impulse-control app. The user captured an impulse, often as a voice ramble that includes their reasoning. Extract everything you can. Return a JSON object with:
 
@@ -92,6 +111,13 @@ You are the intake engine for an impulse-control app. The user captured an impul
 
 8. "desireStrength" — 1-10, how intensely the user seems to want this based on their language. null if you can't tell.
 
+9. "kind" — "HOLD" if the impulse expresses a TIME-BOUND restraint with a hard stop after which the thing becomes allowed (e.g. "not during the day, ok after the kids are asleep", "no snacks until dinner", "don't check email until Monday"). Otherwise "DECISION" (a want to cool down and then decide on).
+
+10. "holdUntil" — only when kind is "HOLD": the end time as "yyyy-MM-dd HH:mm" in the user's local time, resolved against the current time below. "after the kids are asleep" ≈ 21:00 today. "until tomorrow night" ≈ 20:00 tomorrow. "until the weekend" = next Saturday 08:00. null when kind is "DECISION".
+
+Current local time: $nowLocal
+$reinforcement
+
 Return ONLY raw JSON. No markdown fences, no explanation.
 
 Impulse: "$impulseText"
@@ -109,6 +135,17 @@ Impulse: "$impulseText"
             fun stringOrNull(key: String): String? =
                 obj[key]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() && it != "null" }
 
+            val kind = stringOrNull("kind")?.uppercase()
+                ?.takeIf { it == "HOLD" || it == "DECISION" } ?: "DECISION"
+            val holdUntilMs = if (kind == "HOLD") {
+                stringOrNull("holdUntil")?.let { raw ->
+                    runCatching {
+                        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
+                            .parse(raw)?.time
+                    }.getOrNull()
+                }?.takeIf { it > System.currentTimeMillis() }
+            } else null
+
             ClassificationResult(
                 tier = tier,
                 category = category,
@@ -117,7 +154,9 @@ Impulse: "$impulseText"
                 trigger = stringOrNull("trigger"),
                 rationale = stringOrNull("rationale"),
                 estimatedCostUsd = obj["estimatedCostUsd"]?.jsonPrimitive?.doubleOrNull,
-                desireStrength = obj["desireStrength"]?.jsonPrimitive?.intOrNull?.coerceIn(1, 10)
+                desireStrength = obj["desireStrength"]?.jsonPrimitive?.intOrNull?.coerceIn(1, 10),
+                kind = kind,
+                holdUntilMs = holdUntilMs
             )
         }.onFailure {
             Log.e(TAG, "JSON parse failed: $responseText", it)

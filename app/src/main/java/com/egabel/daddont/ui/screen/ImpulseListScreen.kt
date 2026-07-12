@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.egabel.daddont.data.model.ImpulseKind
 import com.egabel.daddont.data.model.ImpulseState
 import com.egabel.daddont.data.model.Prediction
 import com.egabel.daddont.data.model.Verdict
@@ -605,18 +606,22 @@ private fun ImpulseCard(
 
 private fun stateLabel(item: ImpulseWithState): String = when (item.state) {
     ImpulseState.PENDING -> "Classifying…"
-    ImpulseState.RED -> "Hot"
+    ImpulseState.RED -> if (item.impulse.kind == ImpulseKind.HOLD) "Holding" else "Hot"
     ImpulseState.YELLOW -> "Cooling"
-    ImpulseState.GREEN -> "Decide"
+    ImpulseState.GREEN -> if (item.impulse.kind == ImpulseKind.HOLD) "Open" else "Decide"
     ImpulseState.GRAY -> when (item.impulse.verdict) {
         Verdict.DID_IT -> "Did it"
         Verdict.KILLED -> "Killed"
+        Verdict.BROKE -> "Gave up"
+        Verdict.HELD -> "Held"
         null -> "Archived"
     }
 }
 
 private fun statusDetail(item: ImpulseWithState): String? {
+    val isHold = item.impulse.kind == ImpulseKind.HOLD
     item.overdueMs?.let { overdue ->
+        if (isHold) return "open now"
         if (overdue > 86_400_000L) {
             return "${overdue / 86_400_000L}d overdue"
         }

@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.egabel.daddont.DadDontApp
 import com.egabel.daddont.api.gemini.GeminiClient
 import com.egabel.daddont.data.model.Category
+import com.egabel.daddont.data.model.CoolingConfig
+import com.egabel.daddont.data.model.ImpulseKind
 import com.egabel.daddont.data.model.ImpulseState
 import com.egabel.daddont.data.model.Prediction
 import com.egabel.daddont.data.model.Tier
@@ -133,10 +135,12 @@ class ImpulseListViewModel(application: Application) : AndroidViewModel(applicat
 
     private suspend fun classifyNow(impulseId: UUID, content: String) {
         try {
-            val c = gemini.classify(content) ?: return
+            val c = gemini.classify(content, repository.breachSummary()) ?: return
             val impulse = repository.getById(impulseId)?.impulse ?: return
+            val kind = runCatching { ImpulseKind.valueOf(c.kind) }.getOrDefault(ImpulseKind.DECISION)
             val classified = repository.applyClassification(
                 impulse.copy(
+                    kind = kind,
                     tier = Tier.valueOf(c.tier),
                     category = Category.valueOf(c.category),
                     partnerGate = c.partnerGate,
@@ -144,7 +148,10 @@ class ImpulseListViewModel(application: Application) : AndroidViewModel(applicat
                     trigger = c.trigger ?: impulse.trigger,
                     rationale = c.rationale ?: impulse.rationale,
                     estimatedCost = impulse.estimatedCost ?: c.estimatedCostUsd,
-                    desireAtCapture = impulse.desireAtCapture ?: c.desireStrength
+                    desireAtCapture = impulse.desireAtCapture ?: c.desireStrength,
+                    decideBy = if (kind == ImpulseKind.HOLD) {
+                        c.holdUntilMs ?: CoolingConfig.defaultHoldEnd()
+                    } else impulse.decideBy
                 )
             )
             classified.decideBy?.let {

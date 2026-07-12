@@ -2,6 +2,7 @@ package com.egabel.daddont.data.db
 
 import androidx.room.TypeConverter
 import com.egabel.daddont.data.model.Category
+import com.egabel.daddont.data.model.ImpulseKind
 import com.egabel.daddont.data.model.Prediction
 import com.egabel.daddont.data.model.Tier
 import com.egabel.daddont.data.model.Verdict
@@ -37,4 +38,10 @@ class Converters {
 
     @TypeConverter
     fun toPrediction(value: String?): Prediction? = value?.let { Prediction.valueOf(it) }
+
+    @TypeConverter
+    fun fromKind(value: ImpulseKind): String = value.name
+
+    @TypeConverter
+    fun toKind(value: String): ImpulseKind = ImpulseKind.valueOf(value)
 }

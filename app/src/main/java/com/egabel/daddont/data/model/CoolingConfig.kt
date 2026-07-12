@@ -18,4 +18,21 @@ object CoolingConfig {
         Tier.MEDIUM -> mediumWindowMs
         Tier.HIGH -> highWindowMs
     }
+
+    /**
+     * Fallback end time for a HOLD when no explicit time could be parsed:
+     * 9pm tonight, or 9pm tomorrow if that's already passed ("after the
+     * kids are asleep" energy).
+     */
+    fun defaultHoldEnd(now: Long = System.currentTimeMillis()): Long {
+        val cal = java.util.Calendar.getInstance().apply {
+            timeInMillis = now
+            set(java.util.Calendar.HOUR_OF_DAY, 21)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        if (cal.timeInMillis <= now) cal.add(java.util.Calendar.DAY_OF_YEAR, 1)
+        return cal.timeInMillis
+    }
 }

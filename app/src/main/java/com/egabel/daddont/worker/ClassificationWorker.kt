@@ -10,6 +10,8 @@ import androidx.work.WorkerParameters
 import com.egabel.daddont.DadDontApp
 import com.egabel.daddont.api.gemini.GeminiClient
 import com.egabel.daddont.data.model.Category
+import com.egabel.daddont.data.model.CoolingConfig
+import com.egabel.daddont.data.model.ImpulseKind
 import com.egabel.daddont.data.model.Tier
 import com.egabel.daddont.data.repository.ImpulseRepository
 import com.egabel.daddont.widget.WidgetUpdater
@@ -28,16 +30,20 @@ class ClassificationWorker(
         val ungraded = repository.getUngraded()
         if (ungraded.isEmpty()) return Result.success()
 
+        val breachContext = repository.breachSummary()
         var failures = 0
         for (impulse in ungraded) {
             try {
-                val c = gemini.classify(impulse.content)
+                val c = gemini.classify(impulse.content, breachContext)
                 if (c == null) {
                     failures++
                     continue
                 }
+                val kind = runCatching { ImpulseKind.valueOf(c.kind) }
+                    .getOrDefault(ImpulseKind.DECISION)
                 val classified = repository.applyClassification(
                     impulse.copy(
+                        kind = kind,
                         tier = Tier.valueOf(c.tier),
                         category = Category.valueOf(c.category),
                         partnerGate = c.partnerGate,
@@ -45,7 +51,10 @@ class ClassificationWorker(
                         trigger = c.trigger ?: impulse.trigger,
                         rationale = c.rationale ?: impulse.rationale,
                         estimatedCost = impulse.estimatedCost ?: c.estimatedCostUsd,
-                        desireAtCapture = impulse.desireAtCapture ?: c.desireStrength
+                        desireAtCapture = impulse.desireAtCapture ?: c.desireStrength,
+                        decideBy = if (kind == ImpulseKind.HOLD) {
+                            c.holdUntilMs ?: CoolingConfig.defaultHoldEnd()
+                        } else impulse.decideBy
                     )
                 )
                 // Seed the desire curve if the user never set a slider value

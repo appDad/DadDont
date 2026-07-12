@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.egabel.daddont.data.model.DesireCheckIn
+import com.egabel.daddont.data.model.ImpulseKind
 import com.egabel.daddont.data.model.ImpulseState
 import com.egabel.daddont.data.model.Prediction
 import com.egabel.daddont.data.model.Verdict
@@ -127,6 +128,10 @@ fun ImpulseDetailScreen(
     // Defer flow
     var showDeferDialog by remember { mutableStateOf(false) }
 
+    // Breach flow — acted before it cooled
+    var showBreachDialog by remember { mutableStateOf(false) }
+    var breachReason by remember { mutableStateOf("") }
+
     // Cool-until picker flow: date → time
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -157,6 +162,83 @@ fun ImpulseDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            shape = RoundedCornerShape(14.dp)
+        )
+    }
+
+    // ── Breach dialog: record the slip, then keep going or give up ───
+    if (showBreachDialog) {
+        val isPartnerGated = uiState.impulseWithState?.impulse?.partnerGate == true
+        AlertDialog(
+            onDismissRequest = { showBreachDialog = false },
+            title = { Text("Record the breach", fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column {
+                    Text(
+                        "It happens. A slip recorded honestly is training data, not defeat — what happened?",
+                        fontSize = 13.sp, color = TextMid
+                    )
+                    if (isPartnerGated) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "This one was partner-gated. The record is step one — telling them is step two.",
+                            fontSize = 12.sp,
+                            fontStyle = FontStyle.Italic,
+                            color = PartnerBadge
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = breachReason,
+                        onValueChange = { breachReason = it },
+                        placeholder = { Text("What happened? What triggered it?", color = TextDim) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = RedState,
+                            unfocusedBorderColor = BorderColor
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Primary path: the slip is logged and the contract continues
+                    Button(
+                        onClick = {
+                            viewModel.recordSlip(breachReason.trim())
+                            breachReason = ""
+                            showBreachDialog = false
+                        },
+                        enabled = breachReason.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = BlueLeft)
+                    ) {
+                        Text("Slipped — keep going", fontSize = 14.sp)
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    TextButton(
+                        onClick = {
+                            viewModel.recordVerdict(Verdict.BROKE, breachReason.trim())
+                            breachReason = ""
+                            showBreachDialog = false
+                        },
+                        enabled = breachReason.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "Give up on this one entirely",
+                            fontSize = 13.sp,
+                            color = if (breachReason.isNotBlank()) RedState else TextDim
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showBreachDialog = false }) {
                     Text("Cancel", color = TextDim)
                 }
             },
@@ -371,8 +453,61 @@ fun ImpulseDetailScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ── HOLD panel — you made it to the hard stop ────────────────
+            if (state == ImpulseState.GREEN && impulse.kind == ImpulseKind.HOLD) {
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.5.dp, GreenState)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "You made it",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GreenState
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "The hold is over — it's allowed now." +
+                                    if (uiState.breachEvents.isNotEmpty())
+                                        " You slipped ${uiState.breachEvents.size}x along the way, and still got here."
+                                    else " Clean run.",
+                                fontSize = 13.sp,
+                                color = TextMid
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Button(
+                                onClick = { viewModel.recordVerdict(Verdict.HELD) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = GreenState)
+                            ) {
+                                Icon(
+                                    Icons.Default.Check, contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Held out — close it", fontSize = 14.sp)
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            TextButton(onClick = { showDeferDialog = true }) {
+                                Icon(
+                                    Icons.Default.Schedule, contentDescription = null,
+                                    modifier = Modifier.size(15.dp), tint = TextDim
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Extend the hold instead", fontSize = 13.sp, color = TextDim)
+                            }
+                        }
+                    }
+                }
+            }
+
             // ── VERDICT PANEL — pinned first when a decision is due ──────
-            if (state == ImpulseState.GREEN) {
+            if (state == ImpulseState.GREEN && impulse.kind == ImpulseKind.DECISION) {
                 item {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -511,7 +646,7 @@ fun ImpulseDetailScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = detailStateLabel(state, impulse.verdict),
+                                        text = detailStateLabel(state, impulse.verdict, impulse.kind),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = stateColor
@@ -637,7 +772,8 @@ fun ImpulseDetailScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Verdict due ${SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(decideBy))}",
+                                        text = (if (impulse.kind == ImpulseKind.HOLD) "Open at " else "Verdict due ") +
+                                            SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(decideBy)),
                                         fontSize = 11.sp,
                                         color = BlueLeft
                                     )
@@ -656,7 +792,8 @@ fun ImpulseDetailScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Returned ${impulse.returnCount}x · Deferred ${impulse.deferCount}x · Reactivated ${impulse.reactivationCount}x",
+                                text = "Returned ${impulse.returnCount}x · Deferred ${impulse.deferCount}x · Reactivated ${impulse.reactivationCount}x" +
+                                    (if (uiState.breachEvents.isNotEmpty()) " · Slipped ${uiState.breachEvents.size}x" else ""),
                                 fontSize = 11.sp,
                                 color = TextDim
                             )
@@ -812,6 +949,24 @@ fun ImpulseDetailScreen(
                                 }
                             }
                             Spacer(modifier = Modifier.height(10.dp))
+
+                            // Breach — honesty valve for acting before it cooled
+                            OutlinedButton(
+                                onClick = { showBreachDialog = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, RedState.copy(alpha = 0.5f))
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = null,
+                                    tint = RedState,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("I already acted on it", color = RedState, fontSize = 13.sp)
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
                         }
 
                         if (state != ImpulseState.GRAY) {
@@ -914,10 +1069,16 @@ fun ImpulseDetailScreen(
                                     text = when (v) {
                                         Verdict.DID_IT -> "Verdict: Did it"
                                         Verdict.KILLED -> "Verdict: Killed"
+                                        Verdict.BROKE -> "Verdict: Gave up before it finished"
+                                        Verdict.HELD -> "Verdict: Held out to the end"
                                     } + (impulse.verdictNote?.let { " — $it" } ?: ""),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = TextMid
+                                    color = when (v) {
+                                        Verdict.BROKE -> RedState
+                                        Verdict.HELD -> GreenState
+                                        else -> TextMid
+                                    }
                                 )
                                 impulse.verdictAt?.let {
                                     Text(
@@ -1061,8 +1222,8 @@ fun ImpulseDetailScreen(
                 }
             }
 
-            // ── Return history ───────────────────────────────────────────
-            if (uiState.returnEvents.isNotEmpty()) {
+            // ── History: returns + slips, one honest timeline ────────────
+            if (uiState.returnEvents.isNotEmpty() || uiState.breachEvents.isNotEmpty()) {
                 item {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -1078,7 +1239,21 @@ fun ImpulseDetailScreen(
                                 color = TextMid
                             )
                             Spacer(modifier = Modifier.height(10.dp))
-                            uiState.returnEvents.forEach { event ->
+
+                            data class HistoryLine(
+                                val timestamp: Long,
+                                val text: String?,
+                                val isSlip: Boolean
+                            )
+                            val lines = (
+                                uiState.returnEvents.map {
+                                    HistoryLine(it.timestamp, it.rationale, false)
+                                } + uiState.breachEvents.map {
+                                    HistoryLine(it.timestamp, "Slipped — ${it.note}", true)
+                                }
+                            ).sortedBy { it.timestamp }
+
+                            lines.forEach { line ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1089,24 +1264,24 @@ fun ImpulseDetailScreen(
                                         modifier = Modifier
                                             .size(5.dp)
                                             .clip(CircleShape)
-                                            .background(TextDim)
+                                            .background(if (line.isSlip) RedState else TextDim)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = SimpleDateFormat(
                                             "MMM d, h:mm a",
                                             Locale.getDefault()
-                                        ).format(Date(event.timestamp)),
+                                        ).format(Date(line.timestamp)),
                                         fontSize = 11.sp,
                                         color = TextDim
                                     )
-                                    if (event.rationale != null) {
+                                    if (line.text != null) {
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = event.rationale,
+                                            text = line.text,
                                             fontSize = 12.sp,
                                             fontStyle = FontStyle.Italic,
-                                            color = TextMid
+                                            color = if (line.isSlip) RedState else TextMid
                                         )
                                     }
                                 }
@@ -1172,14 +1347,16 @@ private fun NoteChip(label: String, onClick: () -> Unit) {
     )
 }
 
-private fun detailStateLabel(state: ImpulseState, verdict: Verdict?): String = when (state) {
+private fun detailStateLabel(state: ImpulseState, verdict: Verdict?, kind: ImpulseKind): String = when (state) {
     ImpulseState.PENDING -> "Classifying…"
-    ImpulseState.RED -> "Hot"
+    ImpulseState.RED -> if (kind == ImpulseKind.HOLD) "Holding" else "Hot"
     ImpulseState.YELLOW -> "Cooling"
-    ImpulseState.GREEN -> "Decide"
+    ImpulseState.GREEN -> if (kind == ImpulseKind.HOLD) "Open" else "Decide"
     ImpulseState.GRAY -> when (verdict) {
         Verdict.DID_IT -> "Did it"
         Verdict.KILLED -> "Killed"
+        Verdict.BROKE -> "Gave up"
+        Verdict.HELD -> "Held out"
         null -> "Archived"
     }
 }

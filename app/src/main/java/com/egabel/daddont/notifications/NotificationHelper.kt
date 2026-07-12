@@ -39,7 +39,12 @@ object NotificationHelper {
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
 
-    fun notifyVerdictDue(context: Context, impulseId: UUID, content: String) {
+    fun notifyVerdictDue(
+        context: Context,
+        impulseId: UUID,
+        content: String,
+        isHold: Boolean = false
+    ) {
         if (!canNotify(context)) return
 
         val intent = Intent(context, MainActivity::class.java).apply {
@@ -53,13 +58,18 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val title = if (isHold) "You made it — it's open" else "Cooled — verdict time"
+        val bigText = if (isHold) {
+            "You held out on \"$content\". It's allowed now — close it out."
+        } else {
+            "\"$content\" has finished cooling. Did it, or kill it?"
+        }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_VERDICTS)
             .setSmallIcon(R.drawable.ic_logo)
-            .setContentTitle("Cooled — verdict time")
+            .setContentTitle(title)
             .setContentText(content)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(
-                "\"$content\" has finished cooling. Did it, or kill it?"
-            ))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
             .setContentIntent(pending)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

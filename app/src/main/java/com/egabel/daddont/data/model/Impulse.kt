@@ -11,6 +11,7 @@ data class Impulse(
     val content: String,
 
     // Classification
+    val kind: ImpulseKind = ImpulseKind.DECISION,
     val tier: Tier? = null,
     val category: Category? = null,
     val classifiedAt: Long? = null,

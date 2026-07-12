@@ -16,10 +16,14 @@ object ImpulseStateCalculator {
         if (impulse.verdict != null) return ImpulseState.GRAY
 
         val decideBy = impulse.decideBy ?: return ImpulseState.PENDING
-        val start = impulse.classifiedAt ?: impulse.createdAt
 
         if (now >= decideBy) return ImpulseState.GREEN
 
+        // HOLD has a hard stop: you're either holding (RED) or it's open
+        // (GREEN). No yellow — there's nothing gradual about a hard stop.
+        if (impulse.kind == ImpulseKind.HOLD) return ImpulseState.RED
+
+        val start = impulse.classifiedAt ?: impulse.createdAt
         val window = (decideBy - start).coerceAtLeast(1)
         val elapsed = now - start
         return if (elapsed < window / 2) ImpulseState.RED else ImpulseState.YELLOW
@@ -33,6 +37,9 @@ object ImpulseStateCalculator {
         if (impulse.verdict != null) return null
         val decideBy = impulse.decideBy ?: return null
         if (now >= decideBy) return null
+
+        // HOLD: the only transition left is the hard stop itself
+        if (impulse.kind == ImpulseKind.HOLD) return (decideBy - now).coerceAtLeast(0)
 
         val start = impulse.classifiedAt ?: impulse.createdAt
         val window = (decideBy - start).coerceAtLeast(1)

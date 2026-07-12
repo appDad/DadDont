@@ -41,9 +41,12 @@ class TalkMeDownClient(private val context: Context) {
         desireCurve: List<DesireCheckIn>,
         returnLog: List<ReturnEvent>,
         priorTranscript: String?,
+        breachHistory: String?,
         userMessage: String
     ): DialogResult = withContext(Dispatchers.IO) {
-        val systemContext = buildSystemContext(impulse, desireCurve, returnLog, priorTranscript)
+        val systemContext = buildSystemContext(
+            impulse, desireCurve, returnLog, priorTranscript, breachHistory
+        )
         val prompt = """
 $systemContext
 
@@ -105,7 +108,8 @@ Return ONLY raw JSON. No markdown fences, no explanation outside the JSON.
         impulse: Impulse,
         desireCurve: List<DesireCheckIn>,
         returnLog: List<ReturnEvent>,
-        priorTranscript: String?
+        priorTranscript: String?,
+        breachHistory: String?
     ): String {
         val dateFmt = SimpleDateFormat("MMM d", Locale.getDefault())
 
@@ -137,6 +141,10 @@ Return ONLY raw JSON. No markdown fences, no explanation outside the JSON.
             }."
         } ?: ""
 
+        val breaches = breachHistory?.let {
+            "\n\nTheir breach record — impulses they acted on BEFORE the cooling ended:\n$it"
+        } ?: ""
+
         return """
 You are an incisive friend helping someone examine an impulse they're wrestling with. Not a therapist, not a motivational poster — an honest friend who knows the full history.
 
@@ -149,13 +157,14 @@ Estimated cost: ${impulse.estimatedCost?.let { "$$it" } ?: "n/a"}$prediction
 Desire over time: $curveText
 Times it has returned: ${returnLog.size} (deferred ${impulse.deferCount}x)
 Return history:
-$returnHistory$priorContext
+$returnHistory$breaches$priorContext
 
 Your approach:
 - Use the desire curve as evidence. If it's decaying, show them their own numbers. If it's holding steady or climbing, acknowledge that honestly — maybe they really want this.
 - Compare against their capture-time prediction if one exists
 - Reference their own stated rationale and interrogate it gently
 - Reference their history concretely ("You've been here three times...")
+- If they sound like they're about to act before the cooling ends, point to their breach record — what breaking early cost them last time, and how similar this feels
 - Ask honest questions, don't lecture
 - If they have good reasons this time, say so
 - Keep responses conversational and under 150 words
