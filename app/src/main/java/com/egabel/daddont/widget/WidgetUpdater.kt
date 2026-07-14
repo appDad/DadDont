@@ -95,16 +95,19 @@ object WidgetUpdater {
                 if (cooling > 0 || pending > 0) android.view.View.VISIBLE else android.view.View.GONE
             )
 
-            // Backdrop: gray card when all clear, white behind the mosaic
-            setInt(R.id.widget_bg, "setColorFilter", if (allClear) COLOR_GRAY else 0xFFFFFFFF.toInt())
-            setViewVisibility(
-                R.id.widget_clear,
-                if (allClear) android.view.View.VISIBLE else android.view.View.GONE
-            )
-            setViewVisibility(
-                R.id.widget_grid,
-                if (allClear) android.view.View.GONE else android.view.View.VISIBLE
-            )
+            // Backdrop only shows for the all-clear gray card; the mosaic
+            // cells are their own rounded shapes, so hide it otherwise to
+            // avoid a white border peeking around them.
+            if (allClear) {
+                setInt(R.id.widget_bg, "setColorFilter", COLOR_GRAY)
+                setViewVisibility(R.id.widget_bg, android.view.View.VISIBLE)
+                setViewVisibility(R.id.widget_clear, android.view.View.VISIBLE)
+                setViewVisibility(R.id.widget_grid, android.view.View.GONE)
+            } else {
+                setViewVisibility(R.id.widget_bg, android.view.View.GONE)
+                setViewVisibility(R.id.widget_clear, android.view.View.GONE)
+                setViewVisibility(R.id.widget_grid, android.view.View.VISIBLE)
+            }
 
             val intent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
