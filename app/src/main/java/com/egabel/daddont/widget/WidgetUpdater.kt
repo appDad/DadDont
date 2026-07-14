@@ -67,19 +67,44 @@ object WidgetUpdater {
         val hot = byState[ImpulseState.RED]?.size ?: 0
         val cooling = byState[ImpulseState.YELLOW]?.size ?: 0
         val pending = byState[ImpulseState.PENDING]?.size ?: 0
-
-        val (color, count, label) = when {
-            decide > 0 -> Triple(COLOR_GREEN, decide, "DECIDE")
-            hot > 0 -> Triple(COLOR_RED, hot + cooling, "HOT")
-            cooling > 0 -> Triple(COLOR_AMBER, cooling, "COOLING")
-            pending > 0 -> Triple(COLOR_BLUE, pending, "NEW")
-            else -> Triple(COLOR_GRAY, 0, "CLEAR")
-        }
+        val allClear = decide + hot + cooling + pending == 0
 
         return RemoteViews(context.packageName, R.layout.widget_status).apply {
-            setInt(R.id.widget_bg, "setColorFilter", color)
-            setTextViewText(R.id.widget_count, if (count > 0) "$count" else "✓")
-            setTextViewText(R.id.widget_label, label)
+            // One cell per state; zero-count cells collapse and the rest grow
+            fun cell(cellId: Int, bgId: Int, countId: Int, color: Int, count: Int) {
+                if (count > 0) {
+                    setViewVisibility(cellId, android.view.View.VISIBLE)
+                    setInt(bgId, "setColorFilter", color)
+                    setTextViewText(countId, "$count")
+                } else {
+                    setViewVisibility(cellId, android.view.View.GONE)
+                }
+            }
+            cell(R.id.cell_green, R.id.cell_green_bg, R.id.cell_green_count, COLOR_GREEN, decide)
+            cell(R.id.cell_red, R.id.cell_red_bg, R.id.cell_red_count, COLOR_RED, hot)
+            cell(R.id.cell_amber, R.id.cell_amber_bg, R.id.cell_amber_count, COLOR_AMBER, cooling)
+            cell(R.id.cell_blue, R.id.cell_blue_bg, R.id.cell_blue_count, COLOR_BLUE, pending)
+
+            // Collapse empty rows so the other row fills the square
+            setViewVisibility(
+                R.id.row_top,
+                if (decide > 0 || hot > 0) android.view.View.VISIBLE else android.view.View.GONE
+            )
+            setViewVisibility(
+                R.id.row_bottom,
+                if (cooling > 0 || pending > 0) android.view.View.VISIBLE else android.view.View.GONE
+            )
+
+            // Backdrop: gray card when all clear, white behind the mosaic
+            setInt(R.id.widget_bg, "setColorFilter", if (allClear) COLOR_GRAY else 0xFFFFFFFF.toInt())
+            setViewVisibility(
+                R.id.widget_clear,
+                if (allClear) android.view.View.VISIBLE else android.view.View.GONE
+            )
+            setViewVisibility(
+                R.id.widget_grid,
+                if (allClear) android.view.View.GONE else android.view.View.VISIBLE
+            )
 
             val intent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP

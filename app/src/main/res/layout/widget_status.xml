@@ -5,6 +5,7 @@
     android:layout_height="match_parent"
     android:padding="2dp">
 
+    <!-- Card backdrop -->
     <ImageView
         android:id="@+id/widget_bg"
         android:layout_width="match_parent"
@@ -13,28 +14,132 @@
         android:src="@drawable/widget_bg"
         android:contentDescription="@string/app_name" />
 
+    <!-- Mosaic: one cell per state, zero-count cells collapse -->
     <LinearLayout
+        android:id="@+id/widget_grid"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:gravity="center">
+        android:padding="3dp">
 
-        <TextView
-            android:id="@+id/widget_count"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:text="0" />
+        <LinearLayout
+            android:id="@+id/row_top"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/widget_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#E6FFFFFF"
-            android:textSize="9sp"
-            android:letterSpacing="0.1"
-            android:text="CLEAR" />
+            <FrameLayout
+                android:id="@+id/cell_green"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_margin="1dp">
+                <ImageView
+                    android:id="@+id/cell_green_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/widget_cell_bg"
+                    android:importantForAccessibility="no" />
+                <TextView
+                    android:id="@+id/cell_green_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/cell_red"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_margin="1dp">
+                <ImageView
+                    android:id="@+id/cell_red_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/widget_cell_bg"
+                    android:importantForAccessibility="no" />
+                <TextView
+                    android:id="@+id/cell_red_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/row_bottom"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+
+            <FrameLayout
+                android:id="@+id/cell_amber"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_margin="1dp">
+                <ImageView
+                    android:id="@+id/cell_amber_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/widget_cell_bg"
+                    android:importantForAccessibility="no" />
+                <TextView
+                    android:id="@+id/cell_amber_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/cell_blue"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_margin="1dp">
+                <ImageView
+                    android:id="@+id/cell_blue_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/widget_cell_bg"
+                    android:importantForAccessibility="no" />
+                <TextView
+                    android:id="@+id/cell_blue_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+        </LinearLayout>
     </LinearLayout>
+
+    <!-- All-clear overlay -->
+    <TextView
+        android:id="@+id/widget_clear"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:textColor="#FFFFFF"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:text="✓"
+        android:visibility="gone" />
 </FrameLayout>
